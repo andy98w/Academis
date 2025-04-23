@@ -1,9 +1,9 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from .rag_service import get_rag_response
-from .textbook_service import get_textbook_content, get_textbook_toc
+from .textbook_service import get_textbook_content, get_textbook_toc, generate_textbook_content
 from .agent_service import economics_agent
 from typing import Optional
 import logging
@@ -25,6 +25,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Store background tasks to keep them from being garbage collected
+background_tasks_set = set()
+
 class QuestionRequest(BaseModel):
     question: str
     session_id: Optional[str] = "default"
@@ -37,6 +40,10 @@ class AnswerResponse(BaseModel):
 class TextbookRequest(BaseModel):
     unit: Optional[int] = None
     chapter: Optional[str] = None
+    
+class GenerateTextbookRequest(BaseModel):
+    unit: int
+    chapter: str
 
 @app.get("/api/health")
 def health_check():
@@ -221,6 +228,166 @@ async def get_macro_toc():
         return result
     except Exception as e:
         logger.error(f"Error getting macroeconomics TOC: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+        
+async def generate_textbook_content_background(economics_type: str, unit: int, chapter: str):
+    try:
+        from pymongo import MongoClient
+        from pymongo.server_api import ServerApi
+        import os
+        import datetime
+        
+        uri = os.getenv("MONGODB_URI")
+        if not uri:
+            raise ValueError("MONGODB_URI environment variable is not set")
+        
+        client = MongoClient(uri, server_api=ServerApi('1'))
+        db = client.Academis
+        textbook_collection = db.textbook_content
+        
+        chapter_key = f"{economics_type}_{unit}_{chapter}"
+        delete_result = textbook_collection.delete_many({"chapter_id": chapter_key})
+        logger.info(f"Deleted {delete_result.deleted_count} existing documents for {chapter_key}")
+        
+        from .rag_service import get_rag_response, initialize_vector_store
+        from .textbook_service import get_textbook_toc
+        
+        await initialize_vector_store()
+        
+        toc = await get_textbook_toc(economics_type)
+        chapter_title = ""
+        for ch_data in toc["units"][unit]["chapters"]:
+            if chapter == ch_data["chapter_number"] or chapter.lower() in ch_data["title"].lower():
+                chapter_title = ch_data["title"]
+                break
+        
+        if not chapter_title:
+            raise ValueError(f"Chapter {chapter} not found in unit {unit}")
+        prompt = f"""Create comprehensive, in-depth textbook content for {economics_type}economics on the topic: {chapter_title}.
+        
+        This content MUST:
+        1. Be suitable for an AP {economics_type.capitalize()}economics textbook with COLLEGE-LEVEL depth and breadth
+        2. Include extremely thorough definitions of ALL key concepts with multiple aspects and nuances explained
+        3. Provide detailed theoretical explanations with mathematical formulas, equations, and academic-level analysis
+        4. Include MANY real-world examples, case studies, current economic scenarios, and news references
+        5. Present content in a logical progression of ideas with proper transitions between subtopics
+        6. Be comprehensive (15-20 substantial paragraphs MINIMUM) with LENGTHY, DETAILED explanations
+        7. Include example problems WITHIN relevant sections to illustrate concepts as they are explained
+        8. Include 2-4 challenging review questions as a separate section at the end (MINIMUM 2 review questions)
+        9. Include DETAILED descriptions of relevant graphs, tables, and charts, explaining all axes, curves, intersections, and economic interpretations
+        10. Reference concepts from standard AP Economics textbooks, academic sources, and economic research
+        11. Cover ALL important subtopics related to {chapter_title} in exhaustive detail
+        12. Include critical analysis and different perspectives where appropriate
+        13. Add historical context and development of key economic theories
+        
+        FORMATTING REQUIREMENTS:
+        1. Use a single string for the entire content, with formatting markers
+        2. ALWAYS start with '## Introduction' section that provides an overview of the chapter topics and their importance
+        3. Use '## ' to indicate major section headings (e.g., '## Key Concepts', '## Applications')
+        4. Use '**Bold Term**' (without colon) to highlight key terms at the beginning of their paragraphs
+        5. DO NOT use subheadings like "Explanation" - integrate explanations directly into paragraphs
+        6. Each key concept should be presented as: "**Term** refers to/is/means... [definition and explanation with integrated examples]"
+        7. Use '---' to create horizontal rules between major sections
+        8. Use bullet points ('* ') for listing items where appropriate
+        9. Include detailed graph descriptions directly within paragraphs. 
+           Do NOT use separate "Graph:" sections. Instead, explain graphs in the flow of the regular text,
+           giving detailed descriptions of all axes, curves, intersections, and relationships within the 
+           regular paragraphs that explain the concepts.
+        10. For example problems within sections, format them as:
+            "For example, consider the following scenario:" followed by the example problem
+            and its solution in the same paragraph
+        11. Format review questions EXACTLY as shown in this example:
+            '## Review Questions'
+            'Question 1: What is the law of demand?'
+            '**Solution:** The law of demand states that...'
+            'Question 2: Calculate the price elasticity...'
+            '**Solution:** To calculate the price elasticity...'
+            
+            IMPORTANT: For each question's solution, always start on a new line with EXACTLY '**Solution:**' 
+            followed by a space and then the solution text. Do not use "Solution to Question X:" format.
+        12. ALWAYS include a '## Conclusion' section at the end (before the Review Questions) that summarizes key takeaways, practical implications, and bridges to related topics
+
+        For graphs and visual elements, provide extremely detailed text descriptions integrated directly into paragraphs. Explain what each graph would show, including axes labels, curves, points of interest, shifts, movements, and economic interpretations. Include descriptions of ALL standard graphs used in AP Economics textbooks for this topic, but do not create separate graph sections - keep all explanations flowing within the regular text.
+        
+        The content should be comprehensive enough to serve as a complete learning resource for students studying for the AP {economics_type.capitalize()}economics exam."""
+        
+        session_id = f"{economics_type}_{unit}_{chapter}_textbook_gen_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
+        
+        from langchain_openai import ChatOpenAI
+        from langchain.prompts import ChatPromptTemplate
+        from langchain.schema.output_parser import StrOutputParser
+        
+        gpt4_model = ChatOpenAI(model_name="gpt-4", temperature=0.2)
+        prompt_template = ChatPromptTemplate.from_template(prompt)
+        chain = prompt_template | gpt4_model | StrOutputParser()
+        logger.info("Generating content with GPT-4 model for higher quality")
+        response = await chain.ainvoke({})
+        
+        paragraphs = [p.strip() for p in response.split('\n\n') if p.strip()]
+        new_doc = {
+            "chapter_id": chapter_key,
+            "economics_type": economics_type,
+            "unit": unit,
+            "chapter": chapter,
+            "chapter_title": chapter_title,
+            "content": paragraphs,
+            "generated_at": datetime.datetime.utcnow()
+        }
+        
+        result = textbook_collection.insert_one(new_doc)
+        logger.info(f"Successfully regenerated and stored {len(paragraphs)} paragraphs for {chapter_key}")
+        
+    except Exception as e:
+        logger.error(f"Error in background generation for {economics_type} Unit {unit}, Chapter {chapter}: {str(e)}")
+    
+@app.post("/api/textbook/generate/micro", response_model=dict)
+async def generate_micro_content(request: GenerateTextbookRequest):
+    """Generate new content for a microeconomics chapter and store in MongoDB"""
+    try:
+        # Create background task
+        background_task = asyncio.create_task(
+            generate_textbook_content_background("micro", request.unit, request.chapter)
+        )
+        
+        # Add to background tasks set to prevent garbage collection
+        background_tasks_set.add(background_task)
+        # Add a callback to remove the task when done
+        background_task.add_done_callback(lambda t: background_tasks_set.discard(t))
+        
+        return {
+            "status": "processing",
+            "message": f"Content generation for Microeconomics Unit {request.unit}, Chapter {request.chapter} has been started in the background.",
+            "economics_type": "micro",
+            "unit": request.unit,
+            "chapter": request.chapter
+        }
+    except Exception as e:
+        logger.error(f"Error starting content generation: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+        
+@app.post("/api/textbook/generate/macro", response_model=dict)
+async def generate_macro_content(request: GenerateTextbookRequest):
+    """Generate new content for a macroeconomics chapter and store in MongoDB"""
+    try:
+        # Create background task
+        background_task = asyncio.create_task(
+            generate_textbook_content_background("macro", request.unit, request.chapter)
+        )
+        
+        # Add to background tasks set to prevent garbage collection
+        background_tasks_set.add(background_task)
+        # Add a callback to remove the task when done
+        background_task.add_done_callback(lambda t: background_tasks_set.discard(t))
+        
+        return {
+            "status": "processing",
+            "message": f"Content generation for Macroeconomics Unit {request.unit}, Chapter {request.chapter} has been started in the background.",
+            "economics_type": "macro",
+            "unit": request.unit,
+            "chapter": request.chapter
+        }
+    except Exception as e:
+        logger.error(f"Error starting content generation: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":

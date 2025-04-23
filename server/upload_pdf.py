@@ -26,8 +26,8 @@ async def upload_pdf(pdf_path):
     try:
         embeddings = OpenAIEmbeddings()
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=200,
+            chunk_size=1500,
+            chunk_overlap=300,
         )
 
         loader = PyPDFLoader(pdf_path)
