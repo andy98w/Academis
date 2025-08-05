@@ -1,21 +1,31 @@
-# Academis - AP Economics Assistant
+# Academis - Scalable AP Learning Platform
 
-Academis is an AI-powered application designed to help students with AP Economics courses, specifically Microeconomics and Macroeconomics.
+Academis is an AI-powered learning platform designed to help students with Advanced Placement (AP) courses. Currently supporting AP Economics with planned expansion to Biology, Physics, Chemistry, and other AP subjects.
 
 ## Project Structure
 
 The project consists of two main parts:
 
-- **Client**: React frontend with TypeScript
+- **Client**: React frontend with TypeScript and Chakra UI
 - **Server**: Python backend with FastAPI and LangChain for RAG implementation
+
+## Key Features
+
+- **AI-Powered Tutoring**: Personalized assistance with subject-specific knowledge
+- **Interactive Textbooks**: Comprehensive content organized by AP curriculum standards  
+- **Practice Assessment**: AP-style questions with instant feedback
+- **Scalable Architecture**: Easy expansion to new AP subjects
+- **Subject-Specific Chat**: Contextual conversations for each AP subject
+- **Responsive Design**: Works on desktop, tablet, and mobile devices
 
 ## Setup Instructions
 
 ### Prerequisites
 
-- Node.js (v14+)
+- Node.js (v16+)
 - Python (v3.8+)
 - OpenAI API key
+- MongoDB Atlas account (for vector storage)
 
 ### Backend Setup
 
@@ -35,16 +45,21 @@ The project consists of two main parts:
    pip install -r requirements.txt
    ```
 
-4. Configure your OpenAI API key in the `.env` file:
+4. Create a `.env` file with your API keys:
    ```
    OPENAI_API_KEY=your_openai_api_key_here
+   MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/
    ```
 
 5. Start the server:
    ```
+   ./start_server.sh
+   ```
+   Or manually:
+   ```
    python run.py
    ```
-   The server will run on http://localhost:5000
+   The server will run on http://localhost:8080
 
 ### Frontend Setup
 
@@ -64,38 +79,54 @@ The project consists of two main parts:
    ```
    The frontend will run on http://localhost:3000
 
-## Adding Content for RAG
+## Adding Content to the Knowledge Base
 
-### Text Files
-To add text content for the Retrieval-Augmented Generation system:
+### Upload PDF Documents
 
-1. Place text files with AP Microeconomics content in `server/data/micro/`
-2. Place text files with AP Macroeconomics content in `server/data/macro/`
-3. Run the upload script to ingest the files:
+To add PDF documents to the vector database:
 
-```
-python upload_documents.py
+```bash
+cd server
+python upload_pdf.py --pdf /path/to/your/textbook.pdf
 ```
 
-### PDF Files
-To add PDF documents to the knowledge base:
+The system automatically:
+- Extracts text from PDFs using LangChain
+- Creates embeddings using OpenAI
+- Stores in MongoDB Atlas Vector Search for intelligent retrieval
 
-1. Use the upload_pdf.py script to add a PDF to the MongoDB vector store:
+## API Endpoints
 
-```
-python upload_pdf.py --pdf /path/to/your/document.pdf --subject micro
-```
+The platform provides scalable REST API endpoints:
 
-or
+### Generic Subject Endpoints
+- `POST /api/{subject}/ask` - Ask questions to any subject's AI tutor
+- `GET /api/textbook/{subject}/toc` - Get table of contents for any subject
+- `GET /api/textbook/{subject}/unit/{unit_id}` - Get specific unit content
+- `POST /api/textbook/generate/{subject}` - Generate new textbook content
 
-```
-python upload_pdf.py --pdf /path/to/your/document.pdf --subject macro
-```
+### Available Subjects
+- `micro` - AP Microeconomics
+- `macro` - AP Macroeconomics  
+- `biology` - AP Biology *(coming soon)*
+- `physics` - AP Physics *(coming soon)*
+- `chemistry` - AP Chemistry *(coming soon)*
 
-The system stores documents in MongoDB Atlas Vector Search and retrieves relevant context when answering student questions.
+## Architecture Highlights
 
-## Features
+### Scalable Subject System
+- **Backend**: Generic subject handlers with configuration-driven behavior
+- **Frontend**: Single reusable components for all subjects
+- **Adding New Subjects**: Just 2 configuration entries needed
 
-- Interactive chat interface for asking questions about AP Economics
-- Separate sections for Microeconomics and Macroeconomics
-- RAG-based answers that leverage both curated content and large language models
+### Modern Tech Stack
+- **FastAPI**: High-performance Python web framework
+- **React + TypeScript**: Type-safe frontend development
+- **LangChain**: Advanced RAG implementation
+- **MongoDB Atlas**: Vector search and document storage
+- **Chakra UI**: Responsive, accessible component library
+
+### Performance Features  
+- **Intelligent Caching**: Vector embeddings cached for fast retrieval
+- **Background Processing**: Textbook generation runs asynchronously
+- **Optimized Queries**: Subject-specific search with contextual relevance
