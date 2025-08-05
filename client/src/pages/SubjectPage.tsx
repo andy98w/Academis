@@ -7,23 +7,23 @@ import {
   Text,
   Button,
   VStack,
-  Image,
   HStack,
   SimpleGrid,
   useColorModeValue,
-  Icon 
 } from '@chakra-ui/react';
 import { useNavigate } from 'react-router-dom';
-import { FaChartLine, FaBook, FaRobot, FaChalkboardTeacher } from 'react-icons/fa';
+import { FaBook, FaRobot, FaChalkboardTeacher } from 'react-icons/fa';
 import ChatInterface from '../components/ChatInterface';
-import IconWrapper, { renderIcon, FeatureCardIcon } from '../components/IconWrapper';
+import IconWrapper, { FeatureCardIcon } from '../components/IconWrapper';
+import { getSubjectConfig } from '../config/subjects';
 
 const FeatureCard: React.FC<{
   title: string;
   description: string;
-  icon: any; // Use any to bypass the type checking for icon props
+  icon: any;
   onClick?: () => void;
-}> = ({ title, description, icon: IconComponent, onClick }) => {
+  bgColor: string;
+}> = ({ title, description, icon: IconComponent, onClick, bgColor }) => {
   return (
     <Box
       p={5}
@@ -45,7 +45,7 @@ const FeatureCard: React.FC<{
           justify="center"
           color="white"
           rounded="full"
-          bg="teal.500"
+          bg={bgColor}
           mb={1}
         >
           <FeatureCardIcon icon={IconComponent} />
@@ -59,8 +59,13 @@ const FeatureCard: React.FC<{
   );
 };
 
-const MacroEconomicsPage: React.FC = () => {
+interface SubjectPageProps {
+  subjectId: string;
+}
+
+const SubjectPage: React.FC<SubjectPageProps> = ({ subjectId }) => {
   const navigate = useNavigate();
+  const subjectConfig = getSubjectConfig(subjectId);
 
   return (
     <Box minH="100vh" bg="gray.50" position="relative">
@@ -75,13 +80,19 @@ const MacroEconomicsPage: React.FC = () => {
         </Button>
 
         <Flex direction={{ base: 'column', md: 'row' }} align="center" mb={8}>
-          <Box mr={4}><IconWrapper icon={FaChartLine} size={24} color="teal.500" /></Box>
+          <Box mr={4}>
+            <IconWrapper 
+              icon={subjectConfig.icon} 
+              size={24} 
+              color={subjectConfig.colors.primary} 
+            />
+          </Box>
           <Box>
-            <Heading as="h1" size="xl" color="teal.600">
-              AP Macroeconomics
+            <Heading as="h1" size="xl" color={subjectConfig.colors.secondary}>
+              {subjectConfig.fullName}
             </Heading>
             <Text color="gray.600" mt={2}>
-              Explore national economies, economic indicators, and government policies.
+              {subjectConfig.description}
             </Text>
           </Box>
         </Flex>
@@ -90,41 +101,50 @@ const MacroEconomicsPage: React.FC = () => {
           <SimpleGrid columns={{ base: 1, md: 3 }} spacing={10} mb={10}>
             <FeatureCard
               title="Interactive Textbook"
-              description="Access complete AP Macroeconomics content organized by units and chapters."
+              description={`Access complete ${subjectConfig.fullName} content organized by units and chapters.`}
               icon={FaBook}
-              onClick={() => navigate('/textbook/macro')}
+              bgColor={subjectConfig.colors.primary}
+              onClick={() => navigate(`/textbook/${subjectId}`)}
             />
             
             <FeatureCard
               title="AI Tutor"
-              description="Get personalized help and ask questions about any macroeconomics topic."
+              description={`Get personalized help and ask questions about any ${subjectConfig.name.toLowerCase()} topic.`}
               icon={FaRobot}
+              bgColor={subjectConfig.colors.primary}
             />
             
             <FeatureCard
               title="Practice Questions"
               description="Test your knowledge with AP-style questions and get instant feedback."
               icon={FaChalkboardTeacher}
+              bgColor={subjectConfig.colors.primary}
             />
           </SimpleGrid>
           
-          <Box bg="teal.50" p={6} borderRadius="lg" mb={6}>
-            <Heading as="h2" size="lg" mb={4} color="teal.600">
-              Welcome to AP Macroeconomics
+          <Box bg={subjectConfig.colors.bg} p={6} borderRadius="lg" mb={6}>
+            <Heading as="h2" size="lg" mb={4} color={subjectConfig.colors.secondary}>
+              Welcome to {subjectConfig.fullName}
             </Heading>
             <Text mb={4}>
-              This interactive learning platform helps you master AP Macroeconomics concepts through a comprehensive
+              This interactive learning platform helps you master {subjectConfig.fullName} concepts through a comprehensive
               textbook, AI-powered tutoring, and practice materials.
             </Text>
             <Text mb={4}>
               To get started, navigate to the textbook section to explore content by unit, or use the chat assistant
-              in the bottom right corner to ask specific questions about any macroeconomics topic.
+              in the bottom right corner to ask specific questions about any {subjectConfig.name.toLowerCase()} topic.
             </Text>
             <HStack spacing={4} mt={4}>
-              <Button colorScheme="teal" onClick={() => navigate('/textbook/macro')}>
+              <Button 
+                colorScheme={subjectConfig.colors.primary.split('.')[0]} 
+                onClick={() => navigate(`/textbook/${subjectId}`)}
+              >
                 View Textbook
               </Button>
-              <Button colorScheme="blue" variant="outline">
+              <Button 
+                colorScheme="blue" 
+                variant="outline"
+              >
                 Start Practice Quiz
               </Button>
             </HStack>
@@ -133,9 +153,9 @@ const MacroEconomicsPage: React.FC = () => {
       </Container>
       
       {/* Floating Chat Interface */}
-      <ChatInterface subject="macro" floatingMode={true} defaultOpen={false} />
+      <ChatInterface subject={subjectId} floatingMode={true} defaultOpen={false} />
     </Box>
   );
 };
 
-export default MacroEconomicsPage;
+export default SubjectPage;

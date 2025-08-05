@@ -13,9 +13,10 @@ import {
   IconButton,
   Heading,
 } from '@chakra-ui/react';
-import { FaArrowUp, FaChevronUp, FaChevronDown, FaTimes, FaQuestion } from 'react-icons/fa';
+import { FaChevronUp, FaChevronDown, FaTimes, FaQuestion } from 'react-icons/fa';
 import axios from 'axios';
-import IconWrapper, { renderIcon } from './IconWrapper';
+import IconWrapper from './IconWrapper';
+import { getSubjectConfig } from '../config/subjects';
 
 interface Message {
   text: string;
@@ -24,7 +25,7 @@ interface Message {
 }
 
 interface ChatInterfaceProps {
-  subject: 'micro' | 'macro';
+  subject: string;
   floatingMode?: boolean;
   onClose?: () => void;
   defaultOpen?: boolean;
@@ -36,11 +37,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   onClose,
   defaultOpen = true
 }) => {
+  // Get subject configuration
+  const subjectConfig = getSubjectConfig(subject);
+  
   const [messages, setMessages] = useState<Message[]>([
     {
-      text: `Welcome to AP ${
-        subject === 'micro' ? 'Microeconomics' : 'Macroeconomics'
-      }! How can I help you today?`,
+      text: `Welcome to ${subjectConfig.fullName}! How can I help you today?`,
       isUser: false,
       timestamp: new Date(),
     },
@@ -80,7 +82,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
     try {
       // Use the appropriate endpoint based on the subject
-      const endpoint = `http://localhost:8080/api/rag/${subject}/ask`;
+      const endpoint = `http://localhost:8080/api/${subject}/ask`;
       const response = await axios.post(endpoint, {
         question: input,
         session_id: `user_${subject}`, // Create a session ID for the user

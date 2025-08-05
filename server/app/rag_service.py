@@ -16,19 +16,52 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-# MongoDB connection setup
 MONGODB_URI = os.getenv("MONGODB_URI")
-if not MONGODB_URI:
-    raise ValueError("MONGODB_URI environment variable is not set")
-client = MongoClient(MONGODB_URI, server_api=ServerApi("1"), connectTimeoutMS=5000, socketTimeoutMS=10000)
-db = client.Academis
-COLLECTION_NAME = "economics"
-
-logger.info("MongoDB client configured - will connect when first accessed")
+if MONGODB_URI:
+    try:
+        client = MongoClient(MONGODB_URI, server_api=ServerApi("1"), connectTimeoutMS=5000, socketTimeoutMS=10000)
+        db = client.Academis
+        COLLECTION_NAME = "economics"
+        logger.info("MongoDB client configured - will connect when first accessed")
+    except Exception as e:
+        logger.warning(f"Failed to connect to MongoDB: {e}")
+        client = None
+        db = None
+        COLLECTION_NAME = "economics"
+else:
+    logger.warning("MONGODB_URI not set - using fallback textbook mode")
+    client = None
+    db = None
+    COLLECTION_NAME = "economics"
 
 vector_store: Optional[MongoDBAtlasVectorSearch] = None
 
 conversation_history: Dict[str, List[Dict[str, str]]] = {}
+
+async def get_fallback_response(question: str) -> str:
+    """Provide a fallback response when vector store is not available"""
+    logger.info("Using fallback response mode")
+    
+    model = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0.2)
+    
+    prompt = ChatPromptTemplate.from_template("""
+    You are an AP Economics expert. Answer the following question with clear, concise information 
+    suitable for AP Economics students. Focus on core concepts, definitions, and examples.
+    
+    Question: {question}
+    
+    Provide a comprehensive but concise answer covering the key concepts.
+    """)
+    
+    chain = prompt | model | StrOutputParser()
+    
+    try:
+        response = await chain.ainvoke({"question": question})
+        logger.info("Fallback response generated successfully")
+        return response
+    except Exception as e:
+        logger.error(f"Error generating fallback response: {str(e)}")
+        return "I apologize, but I'm currently unable to process your question. Please check that your OpenAI API key is configured correctly and try again."
 
 async def initialize_vector_store():
     global vector_store
@@ -36,18 +69,22 @@ async def initialize_vector_store():
     if vector_store is None:
         logger.info("Initializing vector store...")
         try:
+            if not db:
+                logger.warning("MongoDB not available - vector store initialization skipped")
+                return
+                
             count = db[COLLECTION_NAME].count_documents({})
             logger.info(f"Found {count} documents in MongoDB collection {COLLECTION_NAME}")
             
             if count == 0:
-                raise ValueError(f"No documents found in MongoDB collection {COLLECTION_NAME}")
+                logger.warning(f"No documents found in MongoDB collection {COLLECTION_NAME}")
+                return
             
             embeddings = OpenAIEmbeddings()
             await load_documents(embeddings)
         except Exception as e:
             logger.error(f"Error initializing vector store: {str(e)}")
             logger.error(traceback.format_exc())
-            raise
 
 async def load_documents(embeddings):
     global vector_store
@@ -77,7 +114,7 @@ async def load_documents(embeddings):
             embedding=embeddings,
             collection=collection,
             index_name="economics_vector_index",
-            text_key="text"  # Use "text" field instead of default "page_content"
+            text_key="text"
         )
         
         _ = vector_store.similarity_search("economics test", k=1)
@@ -146,7 +183,8 @@ async def get_rag_response(question: str, session_id: str = "default", use_histo
         await initialize_vector_store()
 
     if vector_store is None:
-        raise ValueError("Vector store not initialized")
+        logger.warning("Vector store not available - using fallback response")
+        return await get_fallback_response(question)
 
     try:
         model = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0.2)

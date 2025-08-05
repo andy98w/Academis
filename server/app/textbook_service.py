@@ -5,6 +5,36 @@ import datetime
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+def _get_chapter_content_with_preview(textbook_collection, subject: str, unit: int, chapter_key: str, chapter_title: str) -> List[str]:
+    """Helper function to get chapter content with conclusion preview"""
+    mongo_key = f"{subject}_{unit}_{chapter_key}"
+    try:
+        mongo_doc = textbook_collection.find_one({"chapter_id": mongo_key})
+        
+        if mongo_doc and "content" in mongo_doc and mongo_doc["content"]:
+            logger.info(f"Found AI-generated content for {mongo_key} in MongoDB")
+            content = mongo_doc["content"]
+            
+            preview_text = "Content not available yet."
+            for i, para in enumerate(content):
+                if para.strip().lower().startswith('## conclusion'):
+                    if i + 1 < len(content) and content[i + 1].strip():
+                        conclusion_para = content[i + 1].strip()
+                        sentences = conclusion_para.split('. ')
+                        if sentences:
+                            preview_text = sentences[0]
+                            if not preview_text.endswith('.'):
+                                preview_text += '.'
+                        break
+            
+            return [preview_text] + content
+        else:
+            logger.info(f"No content available for {chapter_key}")
+            return ["Content not available yet."]
+    except Exception as e:
+        logger.error(f"Error accessing MongoDB for {mongo_key}: {e}")
+        return [f"Error loading content: {str(e)}"]
+
 MICRO_TOC = {
     "type": "micro",
     "units": {
@@ -125,65 +155,68 @@ MACRO_TOC = {
     }
 }
 
-async def get_textbook_toc(economics_type: str) -> dict:
+async def get_textbook_toc(subject: str) -> dict:
     """
-    Get the static table of contents for the economics textbook.
+    Get the table of contents for the specified subject.
     
     Args:
-        economics_type: Either "micro" or "macro"
+        subject: Subject identifier (e.g., "micro", "macro", "biology")
         
     Returns:
         Dictionary with textbook table of contents
     """
-    logger.info(f"Getting {economics_type} textbook table of contents")
+    logger.info(f"Getting {subject} textbook table of contents")
     
     try:
-        if economics_type.lower() == "micro":
-            return MICRO_TOC
-        else:
-            return MACRO_TOC
+        from .subject_config import SubjectConfig
+        subject_config = SubjectConfig.get_subject_config(subject)
+        toc = subject_config["toc"]
+        
+        if toc is None:
+            # For future subjects, load TOC from database or file
+            logger.warning(f"TOC not yet implemented for {subject}")
+            return {
+                "type": subject,
+                "units": {},
+                "message": f"Content for {SubjectConfig.get_full_subject_name(subject)} is coming soon!"
+            }
+        
+        return toc
     
     except Exception as e:
         logger.error(f"Error getting textbook TOC: {str(e)}")
         return {"error": str(e)}
 
-async def get_textbook_content(economics_type: str, unit: int = None, chapter: str = None) -> dict:
+async def get_textbook_content(subject: str, unit: int = None, chapter: str = None) -> dict:
     """
     Retrieve textbook content organized by units and chapters.
     Args:
-        economics_type: Either "micro" or "macro"
-        unit: Optional unit number (1-9 for micro, 1-6 for macro)
+        subject: Subject identifier (e.g., "micro", "macro", "biology")
+        unit: Optional unit number
         chapter: Optional chapter name/title
     Returns:
         Dictionary with textbook content organized by units and chapters
     """
-    logger.info(f"Retrieving {economics_type} textbook content for unit: {unit}, chapter: {chapter}")
+    logger.info(f"Retrieving {subject} textbook content for unit: {unit}, chapter: {chapter}")
     
     try:
-        from pymongo import MongoClient
-        from pymongo.server_api import ServerApi
-        import os
+        from .rag_service import db
+        if db is None:
+            raise ValueError("MongoDB connection not available")
         
-        # MongoDB connection
-        uri = os.getenv("MONGODB_URI")
-        if not uri:
-            raise ValueError("MONGODB_URI environment variable is not set")
-        
-        client = MongoClient(uri, server_api=ServerApi('1'))
-        db = client.Academis
         textbook_collection = db.textbook_content
-        
-        # Get table of contents
-        toc = await get_textbook_toc(economics_type)
+        toc = await get_textbook_toc(subject)
 
         result = {
-            "type": economics_type,
+            "type": subject,
             "units": {}
         }
         
         if unit is not None:
             if unit not in toc["units"]:
-                raise ValueError(f"Unit {unit} not found in {economics_type}economics textbook")
+                from .subject_config import SubjectConfig
+                subject_name = SubjectConfig.get_subject_name(subject)
+                raise ValueError(f"Unit {unit} not found in {subject_name} textbook")
                 
             unit_data = toc["units"][unit]
             result["units"][unit] = {
@@ -199,18 +232,8 @@ async def get_textbook_content(economics_type: str, unit: int = None, chapter: s
                         chapter_key = ch_data["chapter_number"]
                         chapter_title = ch_data["title"]
                         
-                        # Check MongoDB for AI-generated content first
-                        mongo_key = f"{economics_type}_{unit}_{chapter_key}"
-                        mongo_doc = textbook_collection.find_one({"chapter_id": mongo_key})
-                        
-                        if mongo_doc and "content" in mongo_doc and mongo_doc["content"]:
-                            logger.info(f"Found AI-generated content for {mongo_key} in MongoDB")
-                            result["units"][unit]["chapters"][chapter_title] = mongo_doc["content"]
-                        else:
-                            logger.info(f"No content available for {chapter_key}")
-                            result["units"][unit]["chapters"][chapter_title] = [
-                                "Content not available yet."
-                            ]
+                        result["units"][unit]["chapters"][chapter_title] = _get_chapter_content_with_preview(
+                            textbook_collection, subject, unit, chapter_key, chapter_title)
                 
                 if not chapter_found:
                     raise ValueError(f"Chapter '{chapter}' not found in Unit {unit}")
@@ -219,23 +242,15 @@ async def get_textbook_content(economics_type: str, unit: int = None, chapter: s
                     chapter_key = ch_data["chapter_number"]
                     chapter_title = ch_data["title"]
                     
-                    # Check MongoDB for AI-generated content first
-                    mongo_key = f"{economics_type}_{unit}_{chapter_key}"
-                    mongo_doc = textbook_collection.find_one({"chapter_id": mongo_key})
-                    
-                    if mongo_doc and "content" in mongo_doc and mongo_doc["content"]:
-                        logger.info(f"Found AI-generated content for {mongo_key} in MongoDB")
-                        result["units"][unit]["chapters"][chapter_title] = mongo_doc["content"]
-                    else:
-                        logger.info(f"No content available for {chapter_key}")
-                        result["units"][unit]["chapters"][chapter_title] = [
-                            "Content not available yet."
-                        ]
+                    result["units"][unit]["chapters"][chapter_title] = _get_chapter_content_with_preview(
+                        textbook_collection, subject, unit, chapter_key, chapter_title)
         else:
             for unit_num, unit_data in toc["units"].items():
+                from .subject_config import SubjectConfig
+                subject_name = SubjectConfig.get_subject_name(subject)
                 result["units"][unit_num] = {
                     "title": unit_data["title"],
-                    "summary": f"Unit {unit_num}: {unit_data['title']} covers key concepts in {economics_type}economics including " + 
+                    "summary": f"Unit {unit_num}: {unit_data['title']} covers key concepts in {subject_name} including " + 
                               ", ".join([ch["title"] for ch in unit_data["chapters"][:2]]) + 
                               f", and other topics. This unit contains {len(unit_data['chapters'])} chapters."
                 }
@@ -246,13 +261,13 @@ async def get_textbook_content(economics_type: str, unit: int = None, chapter: s
         logger.error(f"Error retrieving textbook content: {str(e)}")
         return {"error": str(e)}
 
-async def generate_textbook_content(economics_type: str, unit: int, chapter: str) -> List[str]:
+async def generate_textbook_content(subject: str, unit: int, chapter: str) -> List[str]:
     """
     Generate textbook content for a specific chapter using an AI model and store it in MongoDB.
     Content is generated once and then retrieved from the database on subsequent requests.
     
     Args:
-        economics_type: Either "micro" or "macro"
+        subject: Subject identifier (e.g., "micro", "macro", "biology")
         unit: Unit number
         chapter: Chapter identifier
         
@@ -260,38 +275,31 @@ async def generate_textbook_content(economics_type: str, unit: int, chapter: str
         List of paragraphs with content for the chapter
     """
     from .rag_service import get_rag_response, initialize_vector_store
-    from pymongo import MongoClient
-    from pymongo.server_api import ServerApi
+    from .subject_config import SubjectConfig
     import os
     
-    logger.info(f"Getting/generating content for {economics_type} Unit {unit}, Chapter {chapter}")
+    logger.info(f"Getting/generating content for {subject} Unit {unit}, Chapter {chapter}")
     
-    # MongoDB connection
-    uri = os.getenv("MONGODB_URI")
-    if not uri:
-        raise ValueError("MONGODB_URI environment variable is not set")
+    from .rag_service import db
+    if db is None:
+        raise ValueError("MongoDB connection not available")
     
-    client = MongoClient(uri, server_api=ServerApi('1'))
-    db = client.Academis
     textbook_collection = db.textbook_content
     
     try:
-        # Check if content already exists in MongoDB
-        chapter_key = f"{economics_type}_{unit}_{chapter}"
+        chapter_key = f"{subject}_{unit}_{chapter}"
         existing_content = textbook_collection.find_one({"chapter_id": chapter_key})
         
         if existing_content and "content" in existing_content:
             logger.info(f"Found existing content for {chapter_key} in MongoDB")
             return existing_content["content"]
         
-        # If not found, generate new content
         logger.info(f"No existing content found for {chapter_key}, generating new content")
         
-        # Initialize vector store if not already done
         await initialize_vector_store()
         
-        # Get the TOC to find the chapter title
-        toc = await get_textbook_toc(economics_type)
+        toc = await get_textbook_toc(subject)
+        subject_config = SubjectConfig.get_subject_config(subject)
         chapter_title = ""
         for ch_data in toc["units"][unit]["chapters"]:
             if chapter == ch_data["chapter_number"] or chapter.lower() in ch_data["title"].lower():
@@ -301,11 +309,12 @@ async def generate_textbook_content(economics_type: str, unit: int, chapter: str
         if not chapter_title:
             raise ValueError(f"Chapter {chapter} not found in unit {unit}")
         
-        # Construct a detailed prompt for the RAG service
-        prompt = f"""Create comprehensive, in-depth textbook content for {economics_type}economics on the topic: {chapter_title}.
+        subject_name = subject_config["name"]
+        full_subject_name = subject_config["full_name"]
+        prompt = f"""Create comprehensive, in-depth textbook content for {full_subject_name} on the topic: {chapter_title}.
         
         This content MUST:
-        1. Be suitable for an AP {economics_type.capitalize()}economics textbook with COLLEGE-LEVEL depth and breadth
+        1. Be suitable for an {full_subject_name} textbook with COLLEGE-LEVEL depth and breadth
         2. Include extremely thorough definitions of ALL key concepts with multiple aspects and nuances explained
         3. Provide detailed theoretical explanations with mathematical formulas, equations, and academic-level analysis
         4. Include MANY real-world examples, case studies, current economic scenarios, and news references
@@ -348,18 +357,14 @@ async def generate_textbook_content(economics_type: str, unit: int, chapter: str
 
         For graphs and visual elements, provide extremely detailed text descriptions integrated directly into paragraphs. Explain what each graph would show, including axes labels, curves, points of interest, shifts, movements, and economic interpretations. Include descriptions of ALL standard graphs used in AP Economics textbooks for this topic, but do not create separate graph sections - keep all explanations flowing within the regular text.
         
-        The content should be comprehensive enough to serve as a complete learning resource for students studying for the AP {economics_type.capitalize()}economics exam."""
+        The content should be comprehensive enough to serve as a complete learning resource for students studying for the {full_subject_name} exam."""
         
-        # Generate session ID specific to this chapter
-        session_id = f"{economics_type}_{unit}_{chapter}_textbook_gen"
+        session_id = f"{subject}_{unit}_{chapter}_textbook_gen"
         
-        # Use RAG to generate content
         response = await get_rag_response(prompt, session_id, use_history=False)
         
-        # Split into paragraphs and clean them
         paragraphs = [p.strip() for p in response.split('\n\n') if p.strip()]
         
-        # Ensure we have content
         if not paragraphs:
             logger.warning(f"No content generated for {economics_type} Unit {unit}, Chapter {chapter}")
             paragraphs = [
@@ -368,16 +373,14 @@ async def generate_textbook_content(economics_type: str, unit: int, chapter: str
                 f"Students will learn about the theoretical frameworks and practical implications of {chapter_title} in {economics_type}economics."
             ]
         
-        # First, delete any existing content for this chapter
         existing_doc = textbook_collection.find_one({"chapter_id": chapter_key})
         if existing_doc:
             logger.info(f"Deleting existing content for {chapter_key} with ID: {existing_doc.get('_id')}")
             textbook_collection.delete_one({"_id": existing_doc.get("_id")})
         
-        # Then insert the new content
         new_doc = {
             "chapter_id": chapter_key,
-            "economics_type": economics_type,
+            "subject": subject,
             "unit": unit,
             "chapter": chapter,
             "chapter_title": chapter_title,

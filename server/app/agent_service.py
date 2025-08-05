@@ -4,11 +4,7 @@ import logging
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
-from langchain.schema.output_parser import StrOutputParser
 from langchain.prompts import ChatPromptTemplate
-# Commented out YouTube search due to missing dependency
-# from langchain_community.tools.youtube.search import YouTubeSearchTool
-from langchain_community.utilities.serpapi import SerpAPIWrapper
 from langchain.agents import AgentExecutor, create_openai_tools_agent
 from langchain.tools import Tool
 from .rag_service import get_rag_response, detect_economics_topic
@@ -18,12 +14,7 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-SERPAPI_API_KEY = os.getenv("SERPAPI_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
-if not SERPAPI_API_KEY:
-    logger.error("SerpAPI API key not found in environment variables")
-    raise ValueError("Missing SERPAPI_API_KEY in .env file")
 
 conversation_memory = {}
 
@@ -46,15 +37,6 @@ class EconomicsAgent:
             )
         )
         
-        logger.info("Initializing SerpAPI Google Search tool")
-        search = SerpAPIWrapper(serpapi_api_key=SERPAPI_API_KEY)
-        tools.append(
-            Tool(
-                name="Google_Search",
-                func=search.run,
-                description="Search Google for current information or explanations about economics concepts and real-world examples. Useful for finding recent economic data, news, or additional explanations."
-            )
-        )
 
         
         return tools
@@ -97,9 +79,8 @@ class EconomicsAgent:
         prompt = ChatPromptTemplate.from_template("""
         You are an AP Economics Expert, providing clear, concise answers.
         
-        Use these tools efficiently in this order:
-        1. AP_Economics_Textbooks: First check academic references
-        2. Google_Search: Then find current examples
+        Use these tools efficiently:
+        1. AP_Economics_Textbooks: Check academic references for comprehensive information
         
         CRITICAL FORMATTING REQUIREMENTS:
         - NEVER include headings like "Supply and Demand Examples:" or "From AP Economics Textbooks:"
@@ -149,7 +130,6 @@ class EconomicsAgent:
         most_recent_turns = []
         older_history = []
         
-        # Identify the most recent Q&A exchange
         if len(history) >= 2:
             user_messages = [msg for msg in history if msg["is_user"]]
             if len(user_messages) >= 2:
@@ -177,7 +157,7 @@ class EconomicsAgent:
                 if len(message_text) > 300:
                     message_text = message_text[:300] + "..."
                 context_parts.append(f"{prefix}: {message_text}")
-            context_parts.append("")  # Empty line
+            context_parts.append("")
             
         if most_recent_turns:
             context_parts.append("MOST RECENT EXCHANGE (PRIMARY CONTEXT FOR FOLLOW-UP QUESTIONS):")
@@ -187,7 +167,7 @@ class EconomicsAgent:
                 if len(message_text) > 300:
                     message_text = message_text[:300] + "..."
                 context_parts.append(f"{prefix}: {message_text}")
-            context_parts.append("")  # Empty line
+            context_parts.append("")
             
         return "\n".join(context_parts)
     
@@ -249,7 +229,6 @@ class EconomicsAgent:
                 
                 rag_answer = await self._search_vector_db_async(question, original_session_id=session_id)
                 
-                # If RAG answer is good, use it
                 if rag_answer and len(rag_answer) > 100:
                     answer = rag_answer
                 else:

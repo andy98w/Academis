@@ -34,6 +34,7 @@ import { FaBook, FaArrowLeft, FaHome, FaCaretDown, FaCaretRight, FaChartLine } f
 import axios from 'axios';
 import ChatInterface from '../components/ChatInterface';
 import IconWrapper, { renderIcon } from '../components/IconWrapper';
+import { getSubjectConfig } from '../config/subjects';
 
 interface Chapter {
   chapter_number: string;
@@ -59,7 +60,7 @@ interface UnitContent {
 }
 
 interface TextbookPageProps {
-  subject: 'micro' | 'macro';
+  subject: string;
 }
 
 const TextbookPage: React.FC<TextbookPageProps> = ({ subject }) => {
@@ -69,6 +70,9 @@ const TextbookPage: React.FC<TextbookPageProps> = ({ subject }) => {
   const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
   const solutionsBgColor = useColorModeValue('blue.50', 'blue.900');
+
+  // Get subject configuration
+  const subjectConfig = getSubjectConfig(subject);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -226,7 +230,7 @@ const TextbookPage: React.FC<TextbookPageProps> = ({ subject }) => {
         </BreadcrumbItem>
         <BreadcrumbItem>
           <BreadcrumbLink as={Link} to={`/textbook/${subject}`}>
-            AP {subject === 'micro' ? 'Microeconomics' : 'Macroeconomics'} Textbook
+{subjectConfig.fullName} Textbook
           </BreadcrumbLink>
         </BreadcrumbItem>
         {unitId && tableOfContents && tableOfContents.units && tableOfContents.units[unitId] && (
@@ -252,11 +256,11 @@ const TextbookPage: React.FC<TextbookPageProps> = ({ subject }) => {
     return (
       <VStack spacing={4} align="stretch" width="100%">
         <Heading as="h2" size="lg" mb={4}>
-          AP {subject === 'micro' ? 'Microeconomics' : 'Macroeconomics'} Textbook
+{subjectConfig.fullName} Textbook
         </Heading>
         
         <Text fontSize="md" color="gray.600" mb={4}>
-          This textbook covers all the essential concepts and topics for the AP {subject === 'micro' ? 'Microeconomics' : 'Macroeconomics'} exam.
+This textbook covers all the essential concepts and topics for the {subjectConfig.fullName} exam.
           Select a unit to start learning.
         </Text>
 
@@ -331,7 +335,7 @@ const TextbookPage: React.FC<TextbookPageProps> = ({ subject }) => {
             Unit {getUnitNumber(unitId)}: {unit.title}
           </Heading>
           <Text color="gray.600" mt={2}>
-            AP {subject === 'micro' ? 'Microeconomics' : 'Macroeconomics'}
+{subjectConfig.fullName}
           </Text>
         </Box>
         
