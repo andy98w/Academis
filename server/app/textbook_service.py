@@ -2,12 +2,14 @@
 import logging
 from typing import Dict, List, Union, Optional
 import datetime
+import json
+import os
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def _get_chapter_content_with_preview(textbook_collection, subject: str, unit: int, chapter_key: str, chapter_title: str) -> List[str]:
     """Helper function to get chapter content with conclusion preview"""
-    mongo_key = f"{subject}_{unit}_{chapter_key}"
+    mongo_key = chapter_key
     try:
         mongo_doc = textbook_collection.find_one({"chapter_id": mongo_key})
         
@@ -17,14 +19,24 @@ def _get_chapter_content_with_preview(textbook_collection, subject: str, unit: i
             
             preview_text = "Content not available yet."
             for i, para in enumerate(content):
-                if para.strip().lower().startswith('## conclusion'):
+                if para.strip().lower().startswith('## conclusion') or para.strip().lower().startswith('## summary'):
                     if i + 1 < len(content) and content[i + 1].strip():
                         conclusion_para = content[i + 1].strip()
-                        sentences = conclusion_para.split('. ')
-                        if sentences:
-                            preview_text = sentences[0]
-                            if not preview_text.endswith('.'):
-                                preview_text += '.'
+                        # Look for **Key Takeaways:** format
+                        if conclusion_para.startswith('**Key Takeaways:**'):
+                            # Extract first sentence after Key Takeaways
+                            text_after_takeaways = conclusion_para.replace('**Key Takeaways:**', '').strip()
+                            sentences = text_after_takeaways.split('. ')
+                            if sentences:
+                                preview_text = sentences[0]
+                                if not preview_text.endswith('.'):
+                                    preview_text += '.'
+                        else:
+                            sentences = conclusion_para.split('. ')
+                            if sentences:
+                                preview_text = sentences[0]
+                                if not preview_text.endswith('.'):
+                                    preview_text += '.'
                         break
             
             return [preview_text] + content
@@ -35,125 +47,44 @@ def _get_chapter_content_with_preview(textbook_collection, subject: str, unit: i
         logger.error(f"Error accessing MongoDB for {mongo_key}: {e}")
         return [f"Error loading content: {str(e)}"]
 
-MICRO_TOC = {
-    "type": "micro",
-    "units": {
-        1: {
-            "title": "Basic Economic Concepts",
-            "chapters": [
-                {"chapter_number": "1.1", "title": "Scarcity and Choice"},
-                {"chapter_number": "1.2", "title": "Opportunity Cost and the Production Possibilities Curve"},
-                {"chapter_number": "1.3", "title": "Comparative Advantage and Trade"},
-                {"chapter_number": "1.4", "title": "Economic Systems"}
-            ]
-        },
-        2: {
-            "title": "Supply and Demand",
-            "chapters": [
-                {"chapter_number": "2.1", "title": "Demand Fundamentals"},
-                {"chapter_number": "2.2", "title": "Supply Fundamentals"},
-                {"chapter_number": "2.3", "title": "Market Equilibrium and Price Determination"},
-                {"chapter_number": "2.4", "title": "Price and Quantity Controls"}
-            ]
-        },
-        3: {
-            "title": "Production, Cost, and the Perfect Competition Model",
-            "chapters": [
-                {"chapter_number": "3.1", "title": "Production and Cost in the Short Run"},
-                {"chapter_number": "3.2", "title": "Production and Cost in the Long Run"},
-                {"chapter_number": "3.3", "title": "Perfect Competition Market Structure"},
-                {"chapter_number": "3.4", "title": "Profit Maximization in Perfectly Competitive Markets"}
-            ]
-        },
-        4: {
-            "title": "Imperfect Competition",
-            "chapters": [
-                {"chapter_number": "4.1", "title": "Monopoly Market Structure"},
-                {"chapter_number": "4.2", "title": "Price Discrimination"},
-                {"chapter_number": "4.3", "title": "Monopolistic Competition"},
-                {"chapter_number": "4.4", "title": "Oligopoly and Game Theory"}
-            ]
-        },
-        5: {
-            "title": "Factor Markets",
-            "chapters": [
-                {"chapter_number": "5.1", "title": "Derived Factor Demand"},
-                {"chapter_number": "5.2", "title": "Marginal Revenue Product"},
-                {"chapter_number": "5.3", "title": "Labor Market and Wages"},
-                {"chapter_number": "5.4", "title": "Interest Rates and Capital Markets"}
-            ]
-        },
-        6: {
-            "title": "Market Failure and the Role of Government",
-            "chapters": [
-                {"chapter_number": "6.1", "title": "Externalities and Public Goods"},
-                {"chapter_number": "6.2", "title": "Public Policy to Address Externalities"},
-                {"chapter_number": "6.3", "title": "Income Distribution and Equity"},
-                {"chapter_number": "6.4", "title": "Government Intervention in Markets"}
-            ]
-        }
-    }
-}
+def _get_chapter_graph_data(textbook_collection, subject: str, unit: int, chapter_key: str):
+    """Get graph data for a chapter if available"""
+    mongo_key = chapter_key
+    try:
+        mongo_doc = textbook_collection.find_one({"chapter_id": mongo_key})
+        if mongo_doc:
+            # Check for new multiple graphs format first
+            if "graphs" in mongo_doc and mongo_doc["graphs"]:
+                return mongo_doc["graphs"]
+            # Fall back to old single graph format
+            elif "graph" in mongo_doc and mongo_doc["graph"]:
+                return {"main": mongo_doc["graph"]}
+        return None
+    except Exception as e:
+        logger.error(f"Error getting graph data for {mongo_key}: {e}")
+        return None
 
-MACRO_TOC = {
-    "type": "macro",
-    "units": {
-        1: {
-            "title": "Basic Economic Concepts",
-            "chapters": [
-                {"chapter_number": "1.1", "title": "Scarcity and Choice in Macroeconomics"},
-                {"chapter_number": "1.2", "title": "Production Possibilities and Opportunity Cost"},
-                {"chapter_number": "1.3", "title": "Comparative Advantage and Trade"},
-                {"chapter_number": "1.4", "title": "Economic Systems and Macroeconomic Objectives"}
-            ]
-        },
-        2: {
-            "title": "Economic Indicators and the Business Cycle",
-            "chapters": [
-                {"chapter_number": "2.1", "title": "Measuring GDP and National Income"},
-                {"chapter_number": "2.2", "title": "Unemployment and Inflation"},
-                {"chapter_number": "2.3", "title": "Business Cycles"},
-                {"chapter_number": "2.4", "title": "Economic Growth and Economic Development"}
-            ]
-        },
-        3: {
-            "title": "National Income and Price Determination",
-            "chapters": [
-                {"chapter_number": "3.1", "title": "Aggregate Demand"},
-                {"chapter_number": "3.2", "title": "Aggregate Supply"},
-                {"chapter_number": "3.3", "title": "Macroeconomic Equilibrium"},
-                {"chapter_number": "3.4", "title": "Fiscal Policy and Economic Stability"}
-            ]
-        },
-        4: {
-            "title": "Financial Sector",
-            "chapters": [
-                {"chapter_number": "4.1", "title": "Money, Banking, and Financial Markets"},
-                {"chapter_number": "4.2", "title": "Monetary Policy"},
-                {"chapter_number": "4.3", "title": "The Money Market"},
-                {"chapter_number": "4.4", "title": "The Loanable Funds Market"}
-            ]
-        },
-        5: {
-            "title": "Long-Run Consequences of Stabilization Policies",
-            "chapters": [
-                {"chapter_number": "5.1", "title": "Fiscal and Monetary Policy Actions"},
-                {"chapter_number": "5.2", "title": "Government Deficits and the National Debt"},
-                {"chapter_number": "5.3", "title": "Crowding Out and Economic Growth"},
-                {"chapter_number": "5.4", "title": "Policy Debates and Economic Schools of Thought"}
-            ]
-        },
-        6: {
-            "title": "Open Economy—International Trade and Finance",
-            "chapters": [
-                {"chapter_number": "6.1", "title": "Balance of Payments Accounts"},
-                {"chapter_number": "6.2", "title": "Exchange Rates and International Capital Flows"},
-                {"chapter_number": "6.3", "title": "Effects of Changes in Trade and Capital Flows"},
-                {"chapter_number": "6.4", "title": "Trade Restrictions and Trade Agreements"}
-            ]
-        }
-    }
-}
+# TOC definitions moved to /data directory as JSON files
+
+def _load_toc_from_file(subject: str) -> dict:
+    """Load table of contents from JSON file in data directory"""
+    try:
+        data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+        toc_file = os.path.join(data_dir, f"{subject}_toc.json")
+        
+        if os.path.exists(toc_file):
+            with open(toc_file, 'r') as f:
+                toc_data = json.load(f)
+                # Convert string keys to integers for units
+                if "units" in toc_data:
+                    toc_data["units"] = {int(k): v for k, v in toc_data["units"].items()}
+                return toc_data
+        else:
+            logger.warning(f"TOC file not found: {toc_file}")
+            return None
+    except Exception as e:
+        logger.error(f"Error loading TOC from file: {e}")
+        return None
 
 async def get_textbook_toc(subject: str) -> dict:
     """
@@ -168,12 +99,18 @@ async def get_textbook_toc(subject: str) -> dict:
     logger.info(f"Getting {subject} textbook table of contents")
     
     try:
+        # First try to load from data directory
+        toc = _load_toc_from_file(subject)
+        
+        if toc:
+            return toc
+        
+        # Fallback to subject config for backwards compatibility
         from .subject_config import SubjectConfig
         subject_config = SubjectConfig.get_subject_config(subject)
         toc = subject_config["toc"]
         
         if toc is None:
-            # For future subjects, load TOC from database or file
             logger.warning(f"TOC not yet implemented for {subject}")
             return {
                 "type": subject,
@@ -232,8 +169,17 @@ async def get_textbook_content(subject: str, unit: int = None, chapter: str = No
                         chapter_key = ch_data["chapter_number"]
                         chapter_title = ch_data["title"]
                         
-                        result["units"][unit]["chapters"][chapter_title] = _get_chapter_content_with_preview(
+                        chapter_content = _get_chapter_content_with_preview(
                             textbook_collection, subject, unit, chapter_key, chapter_title)
+                        
+                        result["units"][unit]["chapters"][chapter_title] = chapter_content
+                        
+                        # Add graph data at the unit level if available
+                        graph_data = _get_chapter_graph_data(textbook_collection, subject, unit, chapter_key)
+                        if graph_data:
+                            if "graphs" not in result["units"][unit]:
+                                result["units"][unit]["graphs"] = {}
+                            result["units"][unit]["graphs"][chapter_key] = graph_data
                 
                 if not chapter_found:
                     raise ValueError(f"Chapter '{chapter}' not found in Unit {unit}")
@@ -242,8 +188,17 @@ async def get_textbook_content(subject: str, unit: int = None, chapter: str = No
                     chapter_key = ch_data["chapter_number"]
                     chapter_title = ch_data["title"]
                     
-                    result["units"][unit]["chapters"][chapter_title] = _get_chapter_content_with_preview(
+                    chapter_content = _get_chapter_content_with_preview(
                         textbook_collection, subject, unit, chapter_key, chapter_title)
+                    
+                    result["units"][unit]["chapters"][chapter_title] = chapter_content
+                    
+                    # Add graph data at the unit level if available  
+                    graph_data = _get_chapter_graph_data(textbook_collection, subject, unit, chapter_key)
+                    if graph_data:
+                        if "graphs" not in result["units"][unit]:
+                            result["units"][unit]["graphs"] = {}
+                        result["units"][unit]["graphs"][chapter_key] = graph_data
         else:
             for unit_num, unit_data in toc["units"].items():
                 from .subject_config import SubjectConfig
@@ -287,7 +242,7 @@ async def generate_textbook_content(subject: str, unit: int, chapter: str) -> Li
     textbook_collection = db.textbook_content
     
     try:
-        chapter_key = f"{subject}_{unit}_{chapter}"
+        chapter_key = chapter
         existing_content = textbook_collection.find_one({"chapter_id": chapter_key})
         
         if existing_content and "content" in existing_content:
@@ -311,66 +266,145 @@ async def generate_textbook_content(subject: str, unit: int, chapter: str) -> Li
         
         subject_name = subject_config["name"]
         full_subject_name = subject_config["full_name"]
-        prompt = f"""Create comprehensive, in-depth textbook content for {full_subject_name} on the topic: {chapter_title}.
-        
-        This content MUST:
-        1. Be suitable for an {full_subject_name} textbook with COLLEGE-LEVEL depth and breadth
-        2. Include extremely thorough definitions of ALL key concepts with multiple aspects and nuances explained
-        3. Provide detailed theoretical explanations with mathematical formulas, equations, and academic-level analysis
-        4. Include MANY real-world examples, case studies, current economic scenarios, and news references
-        5. Present content in a logical progression of ideas with proper transitions between subtopics
-        6. Be comprehensive (15-20 substantial paragraphs MINIMUM) with LENGTHY, DETAILED explanations
-        7. Include example problems WITHIN relevant sections to illustrate concepts as they are explained
-        8. Include 2-4 challenging review questions as a separate section at the end (MINIMUM 2 review questions)
-        9. Include DETAILED descriptions of relevant graphs, tables, and charts, explaining all axes, curves, intersections, and economic interpretations
-        10. Reference concepts from standard AP Economics textbooks, academic sources, and economic research
-        11. Cover ALL important subtopics related to {chapter_title} in exhaustive detail
-        12. Include critical analysis and different perspectives where appropriate
-        13. Add historical context and development of key economic theories
-        
-        FORMATTING REQUIREMENTS:
-        1. Use a single string for the entire content, with formatting markers
-        2. ALWAYS start with '## Introduction' section that provides an overview of the chapter topics and their importance
-        3. Use '## ' to indicate major section headings (e.g., '## Key Concepts', '## Applications')
-        4. Use '**Bold Term**' (without colon) to highlight key terms at the beginning of their paragraphs
-        5. DO NOT use subheadings like "Explanation" - integrate explanations directly into paragraphs
-        6. Each key concept should be presented as: "**Term** refers to/is/means... [definition and explanation with integrated examples]"
-        7. Use '---' to create horizontal rules between major sections
-        8. Use bullet points ('* ') for listing items where appropriate
-        9. Include detailed graph descriptions directly within paragraphs. 
-           Do NOT use separate "Graph:" sections. Instead, explain graphs in the flow of the regular text,
-           giving detailed descriptions of all axes, curves, intersections, and relationships within the 
-           regular paragraphs that explain the concepts.
-        10. For example problems within sections, format them as:
-            "For example, consider the following scenario:" followed by the example problem
-            and its solution in the same paragraph
-        11. Format review questions EXACTLY as shown in this example:
-            '## Review Questions'
-            'Question 1: What is the law of demand?'
-            '**Solution:** The law of demand states that...'
-            'Question 2: Calculate the price elasticity...'
-            '**Solution:** To calculate the price elasticity...'
-            
-            IMPORTANT: For each question's solution, always start on a new line with EXACTLY '**Solution:**' 
-            followed by a space and then the solution text. Do not use "Solution to Question X:" format.
-        12. ALWAYS include a '## Conclusion' section at the end (before the Review Questions) that summarizes key takeaways, practical implications, and bridges to related topics
+        prompt = f"""You are helping students learn {full_subject_name}. Provide comprehensive educational content about {chapter_title}.
 
-        For graphs and visual elements, provide extremely detailed text descriptions integrated directly into paragraphs. Explain what each graph would show, including axes labels, curves, points of interest, shifts, movements, and economic interpretations. Include descriptions of ALL standard graphs used in AP Economics textbooks for this topic, but do not create separate graph sections - keep all explanations flowing within the regular text.
-        
-        The content should be comprehensive enough to serve as a complete learning resource for students studying for the {full_subject_name} exam."""
+Create detailed learning material with these sections:
+
+## Introduction
+Explain what {chapter_title} means and why it's fundamental to understanding economics. Describe how this topic connects to broader economic principles and real-world decision-making.
+
+## Core Economic Principles
+Provide thorough explanations of all key concepts:
+- **Term Name** should be bold and followed by comprehensive definitions
+- Include multiple real-world examples for each concept
+- Explain the economic logic and reasoning behind each principle
+- Show how concepts interconnect and build upon each other
+- Use current economic events and scenarios to illustrate points
+
+## Theoretical Framework
+Explain the academic foundations:
+- Historical development of these economic ideas
+- Mathematical relationships and formulas where applicable
+- Different economic schools of thought and perspectives
+- Step-by-step analysis of how economists approach these concepts
+
+## Practical Applications
+Demonstrate how these concepts work in reality:
+- Current market examples and case studies
+- Government policy applications
+- Business decision-making scenarios
+- Personal finance and individual choice examples
+- International economic comparisons
+
+## Economic Analysis and Models
+Deep dive into analytical frameworks:
+- For any graphical models discussed: explain what each axis represents, the shape and slope of curves/lines, and what different points or areas signify
+- Provide detailed explanations of how to interpret and use the models with specific numerical examples
+- Describe what causes movements along curves versus shifts of entire curves when applicable
+- When discussing economic models that have visual representations, provide thorough explanation first, then mention how they "can be visualized graphically" and add [GRAPH:description] where description briefly describes what the graph should show (e.g., [GRAPH:PPF shift outward due to technology], [GRAPH:supply and demand equilibrium], [GRAPH:elastic vs inelastic demand curves])
+- Include step-by-step problem-solving examples showing calculations and interpretations
+- Connect models to current economic events and policy debates with real-world data
+
+## Review Questions
+Create challenging questions that test understanding:
+
+Question 1: [Conceptual question about key principles]
+
+**Solution:** [Detailed explanation with reasoning]
+
+Question 2: [Application or analytical problem]
+
+**Solution:** [Step-by-step solution with economic interpretation]
+
+## Summary
+**Key Takeaways:** Summarize the most important points students should remember, explain practical significance, and connect to other {full_subject_name} topics.
+
+Write 25-35 substantial paragraphs with college-level depth. Each paragraph should be 5-7 sentences with specific examples, current references, and detailed explanations. Cover ALL important subtopics comprehensively.
+
+IMPORTANT: When discussing any economic models, graphs, or analytical tools:
+- Dedicate at least 3-4 paragraphs to explaining each major model or concept in detail
+- Explain all components, variables, and relationships thoroughly
+- Describe visual representations (curves, lines, axes) and what they signify
+- Provide multiple concrete examples with specific numbers and calculations
+- Explain different scenarios and their implications
+- Discuss real-world applications and policy implications
+- Include step-by-step analysis and problem-solving approaches
+
+Ensure thorough coverage of each major concept with sufficient depth for AP-level understanding."""
         
         session_id = f"{subject}_{unit}_{chapter}_textbook_gen"
         
         response = await get_rag_response(prompt, session_id, use_history=False)
         
-        paragraphs = [p.strip() for p in response.split('\n\n') if p.strip()]
+        # Handle new response format (dict with text and optional graph)
+        graph_data = None
+        if isinstance(response, dict):
+            response_text = response.get('text', '')
+            graph_data = response.get('graph')
+        else:
+            response_text = response
+            
+        # Check if the response contains [GRAPH] markers and generate graphs
+        from .graph_response_handler import graph_response_handler
+        
+        # Split into paragraphs first
+        paragraphs = [p.strip() for p in response_text.split('\n\n') if p.strip()]
+        
+        # Try to use PDF extraction first if available
+        use_pdf_extraction = os.getenv('USE_PDF_GRAPH_EXTRACTION', 'false').lower() == 'true'
+        
+        # Process each paragraph to detect and handle [GRAPH] markers
+        graphs_to_generate = []
+        processed_paragraphs = []
+        
+        for i, paragraph in enumerate(paragraphs):
+            cleaned_para, should_generate, graph_desc = graph_response_handler.extract_graph_suggestion(paragraph)
+            processed_paragraphs.append(cleaned_para)
+            
+            if should_generate:
+                # Find context from surrounding paragraphs
+                context_start = max(0, i - 2)
+                context_end = min(len(paragraphs), i + 1)
+                context_text = ' '.join(paragraphs[context_start:context_end])
+                
+                # If we have a specific graph description, add it to the context
+                if graph_desc:
+                    context_text = f"{graph_desc}. {context_text}"
+                
+                graphs_to_generate.append({
+                    'index': i,
+                    'context': context_text,
+                    'paragraph': cleaned_para,
+                    'description': graph_desc
+                })
+        
+        # Generate graphs for each detected [GRAPH] marker
+        generated_graphs = {}
+        for graph_info in graphs_to_generate:
+            try:
+                graph_data_item = await graph_response_handler.generate_contextual_graph(
+                    graph_info['context'], 
+                    f"{chapter_title} - {graph_info['paragraph'][:100]}"
+                )
+                if graph_data_item:
+                    # Store the graph with the paragraph index as key
+                    generated_graphs[graph_info['index']] = graph_data_item
+                    logger.info(f"Generated {graph_data_item['type']} graph for paragraph {graph_info['index']}")
+            except Exception as e:
+                logger.error(f"Error generating graph for paragraph {graph_info['index']}: {e}")
+        
+        # If we have a single main graph from the response, use it
+        if graph_data and not generated_graphs:
+            generated_graphs['main'] = graph_data
+        
+        paragraphs = processed_paragraphs
         
         if not paragraphs:
-            logger.warning(f"No content generated for {economics_type} Unit {unit}, Chapter {chapter}")
+            logger.warning(f"No content generated for {subject} Unit {unit}, Chapter {chapter}")
             paragraphs = [
                 f"This chapter covers {chapter_title} within {toc['units'][unit]['title']}.",
                 f"It explores key concepts and applications related to {chapter_title}.",
-                f"Students will learn about the theoretical frameworks and practical implications of {chapter_title} in {economics_type}economics."
+                f"Students will learn about the theoretical frameworks and practical implications of {chapter_title} in {subject}."
             ]
         
         existing_doc = textbook_collection.find_one({"chapter_id": chapter_key})
@@ -387,6 +421,14 @@ async def generate_textbook_content(subject: str, unit: int, chapter: str) -> Li
             "content": paragraphs,
             "generated_at": datetime.datetime.utcnow()
         }
+        
+        # Include graph data if available
+        if generated_graphs:
+            # Store multiple graphs with their positions
+            new_doc["graphs"] = generated_graphs
+            logger.info(f"Stored {len(generated_graphs)} graphs with {chapter_key}")
+            for key, graph in generated_graphs.items():
+                logger.info(f"  - Graph at position {key}: {graph.get('type', 'unknown')}")
         
         result = textbook_collection.insert_one(new_doc)
         logger.info(f"Inserted new content for {chapter_key} with ID: {result.inserted_id}")

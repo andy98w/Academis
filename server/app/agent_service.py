@@ -22,7 +22,7 @@ class EconomicsAgent:
     """Agent that combines RAG with web search and YouTube for comprehensive AP Economics answers"""
     
     def __init__(self):
-        self.model = ChatOpenAI(temperature=0, model="gpt-3.5-turbo", max_tokens=1024)
+        self.model = ChatOpenAI(temperature=0, model="gpt-4o", max_tokens=1024)
         self.tools = self._initialize_tools()
         
     def _initialize_tools(self) -> List[Tool]:

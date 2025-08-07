@@ -1,5 +1,4 @@
 from typing import Dict, List, Any
-from .textbook_service import MICRO_TOC, MACRO_TOC
 
 class SubjectConfig:
     """Configuration for different AP subjects"""
@@ -9,7 +8,7 @@ class SubjectConfig:
             "name": "Microeconomics",
             "full_name": "AP Microeconomics",
             "description": "Study individual economic behavior, markets, and business decisions.",
-            "toc": MICRO_TOC,
+            "toc": None,  # Loaded from data/micro_toc.json
             "collection_prefix": "economics",
             "agent_prefix": "[Microeconomics Question]"
         },
@@ -17,7 +16,7 @@ class SubjectConfig:
             "name": "Macroeconomics", 
             "full_name": "AP Macroeconomics",
             "description": "Explore national economies, economic indicators, and government policies.",
-            "toc": MACRO_TOC,
+            "toc": None,  # Loaded from data/macro_toc.json
             "collection_prefix": "economics",
             "agent_prefix": "[Macroeconomics Question]"
         },

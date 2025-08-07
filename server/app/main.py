@@ -5,6 +5,8 @@ from dotenv import load_dotenv
 from .textbook_service import get_textbook_content, get_textbook_toc, generate_textbook_content
 from .agent_service import economics_agent
 from .subject_config import SubjectConfig
+from .graph_service import graph_generator
+from .graph_storage import graph_storage
 from typing import Optional
 import logging
 import asyncio
@@ -121,6 +123,67 @@ async def get_subject_toc(subject: str):
 @app.post("/api/textbook/generate/{subject}", response_model=dict)
 async def generate_subject_content(subject: str, request: GenerateTextbookRequest):
     return await _generate_content_endpoint(subject, request)
+
+# Graph generation endpoints
+@app.post("/api/graph/ppf")
+async def generate_ppf_graph(request: dict):
+    """Generate Production Possibilities Frontier graph"""
+    good1 = request.get("good1", "Guns")
+    good2 = request.get("good2", "Butter") 
+    points = request.get("points")
+    
+    image_base64 = await graph_generator.generate_ppf_curve(good1, good2, points)
+    return {"image": image_base64, "type": "ppf"}
+
+@app.post("/api/graph/supply-demand")
+async def generate_supply_demand_graph(request: dict):
+    """Generate supply and demand curves"""
+    market = request.get("market", "Generic Market")
+    eq_price = request.get("equilibrium_price", 10)
+    eq_quantity = request.get("equilibrium_quantity", 100)
+    
+    image_base64 = await graph_generator.generate_supply_demand_curve(market, eq_price, eq_quantity)
+    return {"image": image_base64, "type": "supply_demand"}
+
+@app.post("/api/graph/elasticity")
+async def generate_elasticity_graph(request: dict):
+    """Generate price elasticity visualization"""
+    demand_type = request.get("demand_type", "elastic")
+    
+    image_base64 = await graph_generator.generate_elasticity_graph(demand_type)
+    return {"image": image_base64, "type": "elasticity"}
+
+@app.post("/api/graph/custom")
+async def generate_custom_graph(request: dict):
+    """Generate custom economic graphs from natural language"""
+    graph_request = request.get("request", "")
+    
+    if not graph_request:
+        return {"error": "No graph request provided"}
+    
+    image_base64 = await graph_generator.generate_custom_economic_graph(graph_request)
+    return {"image": image_base64, "type": "custom"}
+
+# Graph storage endpoints
+@app.get("/api/graph/{graph_id}")
+async def get_graph_by_id(graph_id: str):
+    """Retrieve stored graph by ID"""
+    graph = await graph_storage.get_graph_by_id(graph_id)
+    if not graph:
+        raise HTTPException(status_code=404, detail="Graph not found")
+    return graph
+
+@app.get("/api/graphs")
+async def list_graphs(subject: str = None, graph_type: str = None, limit: int = 50):
+    """List stored graphs with optional filtering"""
+    graphs = await graph_storage.list_graphs(subject, graph_type, limit)
+    return {"graphs": graphs, "count": len(graphs)}
+
+@app.delete("/api/graphs/cleanup")
+async def cleanup_expired_graphs():
+    """Clean up expired graphs"""
+    deleted_count = await graph_storage.cleanup_expired_graphs()
+    return {"message": f"Cleaned up {deleted_count} expired graphs"}
 
 # Backwards compatibility endpoints (these can be removed later)
 @app.post("/api/rag/micro/ask", response_model=AnswerResponse)

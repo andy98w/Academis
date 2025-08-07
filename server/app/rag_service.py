@@ -69,7 +69,7 @@ async def initialize_vector_store():
     if vector_store is None:
         logger.info("Initializing vector store...")
         try:
-            if not db:
+            if db is None:
                 logger.warning("MongoDB not available - vector store initialization skipped")
                 return
                 
@@ -101,7 +101,7 @@ async def load_documents(embeddings):
         indexes = collection.list_indexes()
         vector_index_exists = False
         for index in indexes:
-            if "economics_vector_index" in index.get("name", ""):
+            if "vector_index" in index.get("name", ""):
                 vector_index_exists = True
                 logger.info("Vector index found in MongoDB collection")
                 break
@@ -113,7 +113,7 @@ async def load_documents(embeddings):
             collection_name=COLLECTION_NAME,
             embedding=embeddings,
             collection=collection,
-            index_name="economics_vector_index",
+            index_name="vector_index",
             text_key="text"
         )
         
@@ -187,7 +187,7 @@ async def get_rag_response(question: str, session_id: str = "default", use_histo
         return await get_fallback_response(question)
 
     try:
-        model = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0.2)
+        model = ChatOpenAI(model_name="gpt-4o", temperature=0.2)
         
         add_to_conversation_history(session_id, "user", question)
         
@@ -272,6 +272,16 @@ async def get_rag_response(question: str, session_id: str = "default", use_histo
         - The most recent exchange in the conversation history is the most relevant context for follow-up questions
         - For example, if the last topic was "supply and demand" and the student asks "explain it with examples," give examples of supply and demand, not any earlier topics
         
+        GRAPH VISUALIZATION INSTRUCTIONS:
+        - When you mention that something is a "graphical representation," "shown on a graph," "can be visualized," or use similar language, add [GRAPH] at the end of your response
+        - Only add [GRAPH] when you specifically mention graphs, charts, curves, or visual representations in your explanation
+        - Do NOT add [GRAPH] for purely text-based explanations
+        - Examples:
+          * "The PPF is a graphical representation of..." → add [GRAPH]
+          * "Supply and demand curves show..." → add [GRAPH] 
+          * "This can be illustrated on a graph..." → add [GRAPH]
+          * "Scarcity means limited resources" → do NOT add [GRAPH]
+        
         {{history_text}}
         References:
         {{context}}
@@ -279,7 +289,7 @@ async def get_rag_response(question: str, session_id: str = "default", use_histo
         Student's Question:
         {{question}}
         
-        Answer (remember, NO source attribution or headings):
+        Answer (remember, NO source attribution or headings, suggest graphs when helpful):
         """
         
         prompt = ChatPromptTemplate.from_template(template)
@@ -290,10 +300,31 @@ async def get_rag_response(question: str, session_id: str = "default", use_histo
             "history_text": history_text
         })
         
-        add_to_conversation_history(session_id, "assistant", response)
-        logger.info(f"Generated response of length {len(response)}")
+        # Check for graph suggestion and generate if needed
+        try:
+            from .graph_response_handler import graph_response_handler
+            
+            cleaned_response, should_generate_graph, graph_desc = graph_response_handler.extract_graph_suggestion(response)
+            
+            result = {"text": cleaned_response}
+            
+            if should_generate_graph:
+                try:
+                    graph_data = await graph_response_handler.generate_contextual_graph(cleaned_response, question)
+                    if graph_data:
+                        result["graph"] = graph_data
+                        logger.info(f"Generated {graph_data['type']} graph for response")
+                except Exception as e:
+                    logger.error(f"Error generating graph for response: {e}")
+        except ImportError as e:
+            logger.warning(f"Graph functionality disabled due to missing dependencies: {e}")
+            cleaned_response = response.replace('[GRAPH]', '').strip() if '[GRAPH]' in response else response
+            result = {"text": cleaned_response}
         
-        return response
+        add_to_conversation_history(session_id, "assistant", cleaned_response)
+        logger.info(f"Generated response of length {len(cleaned_response)}")
+        
+        return result
     except Exception as e:
         logger.error(f"Error generating response: {str(e)}")
         error_message = f"I'm sorry, I encountered an error while trying to answer your question: {str(e)}"
