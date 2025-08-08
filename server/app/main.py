@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 from .textbook_service import get_textbook_content, get_textbook_toc, generate_textbook_content
 from .agent_service import economics_agent
 from .subject_config import SubjectConfig
-from .graph_service import graph_generator
 from .graph_storage import graph_storage
 from typing import Optional
 import logging
@@ -124,45 +123,31 @@ async def get_subject_toc(subject: str):
 async def generate_subject_content(subject: str, request: GenerateTextbookRequest):
     return await _generate_content_endpoint(subject, request)
 
-# Graph generation endpoints
-@app.post("/api/graph/ppf")
-async def generate_ppf_graph(request: dict):
-    """Generate Production Possibilities Frontier graph"""
-    good1 = request.get("good1", "Guns")
-    good2 = request.get("good2", "Butter") 
-    points = request.get("points")
-    
-    image_base64 = await graph_generator.generate_ppf_curve(good1, good2, points)
-    return {"image": image_base64, "type": "ppf"}
+# Graph generation endpoint - Universal system replaces hardcoded types
 
-@app.post("/api/graph/supply-demand")
-async def generate_supply_demand_graph(request: dict):
-    """Generate supply and demand curves"""
-    market = request.get("market", "Generic Market")
-    eq_price = request.get("equilibrium_price", 10)
-    eq_quantity = request.get("equilibrium_quantity", 100)
+@app.post("/api/graph/universal")
+async def generate_universal_graph(request: dict):
+    """Generate graphs universally based on content analysis - no hardcoded types"""
+    content = request.get("content", "")
+    title = request.get("title", "")
     
-    image_base64 = await graph_generator.generate_supply_demand_curve(market, eq_price, eq_quantity)
-    return {"image": image_base64, "type": "supply_demand"}
-
-@app.post("/api/graph/elasticity")
-async def generate_elasticity_graph(request: dict):
-    """Generate price elasticity visualization"""
-    demand_type = request.get("demand_type", "elastic")
+    if not content:
+        return {"error": "No content provided for analysis"}
     
-    image_base64 = await graph_generator.generate_elasticity_graph(demand_type)
-    return {"image": image_base64, "type": "elasticity"}
-
-@app.post("/api/graph/custom")
-async def generate_custom_graph(request: dict):
-    """Generate custom economic graphs from natural language"""
-    graph_request = request.get("request", "")
+    from .graph_service import universal_graph_generator
     
-    if not graph_request:
-        return {"error": "No graph request provided"}
+    result = await universal_graph_generator.generate_contextual_graph(content, title)
     
-    image_base64 = await graph_generator.generate_custom_economic_graph(graph_request)
-    return {"image": image_base64, "type": "custom"}
+    if not result:
+        return {"message": "No visualization needed for this content", "graph_generated": False}
+    
+    return {
+        "graph_generated": True,
+        "type": result["type"],
+        "image": result["image"],
+        "title": result["title"],
+        "description": result["description"]
+    }
 
 # Graph storage endpoints
 @app.get("/api/graph/{graph_id}")
@@ -185,14 +170,6 @@ async def cleanup_expired_graphs():
     deleted_count = await graph_storage.cleanup_expired_graphs()
     return {"message": f"Cleaned up {deleted_count} expired graphs"}
 
-# Backwards compatibility endpoints (these can be removed later)
-@app.post("/api/rag/micro/ask", response_model=AnswerResponse)
-async def ask_micro_question(request: QuestionRequest):
-    return await _subject_endpoint(request, "micro")
-
-@app.post("/api/rag/macro/ask", response_model=AnswerResponse)
-async def ask_macro_question(request: QuestionRequest):
-    return await _subject_endpoint(request, "macro")
 
 async def generate_textbook_content_background(subject: str, unit: int, chapter: str):
     try:

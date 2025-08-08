@@ -1,13 +1,21 @@
+"""
+Universal Graph Generation Service
+
+This service analyzes any educational content and creates appropriate visualizations
+without hardcoding specific graph types or economic concepts. It dynamically determines:
+1. What variables/concepts need to be visualized
+2. What type of relationship exists between them
+3. How to best represent that relationship visually
+"""
+
 import os
 import io
 import base64
 import json
 import logging
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Dict, List, Any, Optional
 import matplotlib.pyplot as plt
-import matplotlib.patches as patches
 import numpy as np
-from sympy import symbols, lambdify, sympify
 import seaborn as sns
 from langchain_openai import ChatOpenAI
 from langchain.schema.output_parser import StrOutputParser
@@ -16,318 +24,325 @@ from dotenv import load_dotenv
 from .graph_storage import graph_storage
 
 load_dotenv()
-
 logger = logging.getLogger(__name__)
 
 # Set matplotlib to use non-interactive backend
 plt.switch_backend('Agg')
 sns.set_style("whitegrid")
 
-class GraphGenerator:
+class UniversalGraphGenerator:
     def __init__(self):
-        self.model = ChatOpenAI(model_name="gpt-4o", temperature=0.1)
+        self.model = ChatOpenAI(model_name="gpt-4o", temperature=0.2)
     
-    async def generate_ppf_curve(self, good1: str = "Guns", good2: str = "Butter", 
-                                points: Optional[List[Tuple[float, float]]] = None) -> str:
-        """Generate Production Possibilities Frontier curve"""
-        
-        # Check cache first
-        parameters = {"good1": good1, "good2": good2, "points": points}
-        cached_image = await graph_storage.get_cached_graph("ppf", parameters)
-        if cached_image:
-            return cached_image
-        
-        if not points:
-            # Use AI to generate realistic PPF data points
-            points = await self._get_ppf_data_points(good1, good2)
-            parameters["points"] = points
-        
-        fig, ax = plt.subplots(figsize=(10, 8))
-        
-        # Extract x and y coordinates
-        x_coords = [p[0] for p in points]
-        y_coords = [p[1] for p in points]
-        
-        # Create smooth curve
-        x_smooth = np.linspace(0, max(x_coords), 100)
-        # Fit a simple concave curve (typical for PPF)
-        y_smooth = max(y_coords) * (1 - (x_smooth / max(x_coords)) ** 1.5)
-        
-        # Plot PPF curve
-        ax.plot(x_smooth, y_smooth, 'b-', linewidth=3, label='PPF Curve')
-        ax.fill_between(x_smooth, 0, y_smooth, alpha=0.2, color='lightblue', label='Attainable Region')
-        
-        # Plot example points
-        ax.scatter(x_coords, y_coords, color='red', s=100, zorder=5)
-        
-        # Add point labels
-        for i, (x, y) in enumerate(points):
-            ax.annotate(f'Point {chr(65+i)}', (x, y), xytext=(5, 5), 
-                       textcoords='offset points', fontsize=10)
-        
-        # Formatting
-        ax.set_xlabel(f'{good1} (units)', fontsize=12)
-        ax.set_ylabel(f'{good2} (units)', fontsize=12)
-        ax.set_title(f'Production Possibilities Frontier: {good1} vs {good2}', fontsize=14, pad=20)
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        ax.set_xlim(0, max(x_coords) * 1.1)
-        ax.set_ylim(0, max(y_coords) * 1.1)
-        
-        image_base64 = self._fig_to_base64(fig)
-        
-        # Store in cache
-        await graph_storage.store_graph("ppf", parameters, image_base64, 
-                                       tags=["unit1", "ppf", "trade-offs"])
-        
-        return image_base64
-    
-    async def generate_ppf_shift(self, good1: str = "Guns", good2: str = "Butter") -> str:
-        """Generate PPF curve showing an outward shift due to technology/resources"""
-        
-        # Check cache first
-        parameters = {"good1": good1, "good2": good2, "type": "shift"}
-        cached_image = await graph_storage.get_cached_graph("ppf_shift", parameters)
-        if cached_image:
-            return cached_image
-        
-        fig, ax = plt.subplots(figsize=(10, 8))
-        
-        # Generate original PPF points
-        original_points = await self._get_ppf_data_points(good1, good2)
-        
-        # Generate shifted PPF points (increased by 30-50%)
-        shift_factor = 1.4
-        shifted_points = [(x * shift_factor, y * shift_factor) for x, y in original_points]
-        
-        # Create smooth curves for both PPFs
-        def create_ppf_curve(points, color, label, alpha=0.7):
-            x_coords = [p[0] for p in points]
-            y_coords = [p[1] for p in points]
-            x_smooth = np.linspace(0, max(x_coords), 100)
-            y_smooth = max(y_coords) * (1 - (x_smooth / max(x_coords)) ** 1.5)
-            ax.plot(x_smooth, y_smooth, color=color, linewidth=3, label=label, alpha=alpha)
-            return x_smooth, y_smooth
-        
-        # Plot original PPF (dashed)
-        create_ppf_curve(original_points, 'gray', 'Original PPF', alpha=0.5)
-        
-        # Plot shifted PPF (solid)
-        x_new, y_new = create_ppf_curve(shifted_points, 'blue', 'New PPF (after technology improvement)')
-        
-        # Add arrow showing the shift
-        mid_idx = len(x_new) // 2
-        x_orig = x_new[mid_idx] / shift_factor
-        y_orig = y_new[mid_idx] / shift_factor
-        ax.annotate('', xy=(x_new[mid_idx], y_new[mid_idx]), xytext=(x_orig, y_orig),
-                   arrowprops=dict(arrowstyle='->', lw=2, color='red'))
-        ax.text((x_orig + x_new[mid_idx])/2, (y_orig + y_new[mid_idx])/2 + max(y_new)*0.05, 
-               'Economic Growth\n(Technology/Resources)', 
-               ha='center', va='bottom', fontsize=10, color='red', weight='bold')
-        
-        # Formatting
-        ax.set_xlabel(f'{good1} (units)', fontsize=12)
-        ax.set_ylabel(f'{good2} (units)', fontsize=12)
-        ax.set_title(f'PPF Shift: Impact of Economic Growth\n{good1} vs {good2}', fontsize=14, pad=20)
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        
-        # Set limits based on shifted PPF
-        max_x = max([p[0] for p in shifted_points]) * 1.1
-        max_y = max([p[1] for p in shifted_points]) * 1.1
-        ax.set_xlim(0, max_x)
-        ax.set_ylim(0, max_y)
-        
-        image_base64 = self._fig_to_base64(fig)
-        
-        # Store in cache
-        await graph_storage.store_graph("ppf_shift", parameters, image_base64, 
-                                       tags=["unit1", "ppf", "economic-growth", "technology"])
-        
-        return image_base64
-    
-    async def generate_supply_demand_curve(self, market: str = "Generic Market",
-                                         equilibrium_price: float = 10,
-                                         equilibrium_quantity: float = 100) -> str:
-        """Generate supply and demand curves"""
-        
-        # Check cache first
-        parameters = {"market": market, "equilibrium_price": equilibrium_price, 
-                     "equilibrium_quantity": equilibrium_quantity}
-        cached_image = await graph_storage.get_cached_graph("supply_demand", parameters)
-        if cached_image:
-            return cached_image
-        
-        fig, ax = plt.subplots(figsize=(10, 8))
-        
-        # Generate quantity range
-        q = np.linspace(0, equilibrium_quantity * 2, 100)
-        
-        # Supply curve: upward sloping
-        supply_price = equilibrium_price * (q / equilibrium_quantity) ** 0.5
-        
-        # Demand curve: downward sloping  
-        demand_price = equilibrium_price * 2 - (equilibrium_price * q / equilibrium_quantity)
-        demand_price = np.maximum(demand_price, 0)  # Price can't be negative
-        
-        # Plot curves
-        ax.plot(q, supply_price, 'r-', linewidth=3, label='Supply')
-        ax.plot(q, demand_price, 'b-', linewidth=3, label='Demand')
-        
-        # Mark equilibrium point
-        ax.plot(equilibrium_quantity, equilibrium_price, 'go', markersize=12, 
-                label=f'Equilibrium (Q={equilibrium_quantity}, P=${equilibrium_price})')
-        
-        # Add equilibrium lines
-        ax.axhline(y=equilibrium_price, color='gray', linestyle='--', alpha=0.7)
-        ax.axvline(x=equilibrium_quantity, color='gray', linestyle='--', alpha=0.7)
-        
-        # Formatting
-        ax.set_xlabel('Quantity', fontsize=12)
-        ax.set_ylabel('Price ($)', fontsize=12)
-        ax.set_title(f'Supply and Demand: {market}', fontsize=14, pad=20)
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        ax.set_xlim(0, equilibrium_quantity * 2)
-        ax.set_ylim(0, equilibrium_price * 2.2)
-        
-        image_base64 = self._fig_to_base64(fig)
-        
-        # Store in cache
-        await graph_storage.store_graph("supply_demand", parameters, image_base64,
-                                       tags=["supply", "demand", "equilibrium"])
-        
-        return image_base64
-    
-    async def generate_elasticity_graph(self, demand_type: str = "elastic") -> str:
-        """Generate price elasticity of demand visualization"""
-        
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
-        
-        q = np.linspace(1, 100, 100)
-        
-        if demand_type.lower() == "elastic":
-            # Elastic demand - flat curve
-            p1 = 50 - 0.3 * q
-            p1 = np.maximum(p1, 0)
-            title1 = "Elastic Demand (Ed > 1)"
-            
-            # Inelastic demand - steep curve
-            p2 = 50 - 0.05 * q
-            p2 = np.maximum(p2, 0)
-            title2 = "Inelastic Demand (Ed < 1)"
-        else:
-            # Inelastic demand - steep curve
-            p1 = 50 - 0.05 * q
-            p1 = np.maximum(p1, 0)
-            title1 = "Inelastic Demand (Ed < 1)"
-            
-            # Elastic demand - flat curve
-            p2 = 50 - 0.3 * q
-            p2 = np.maximum(p2, 0)
-            title2 = "Elastic Demand (Ed > 1)"
-        
-        # Plot both curves
-        ax1.plot(q, p1, 'b-', linewidth=3)
-        ax1.set_title(title1, fontsize=12)
-        ax1.set_xlabel('Quantity')
-        ax1.set_ylabel('Price')
-        ax1.grid(True, alpha=0.3)
-        
-        ax2.plot(q, p2, 'r-', linewidth=3)
-        ax2.set_title(title2, fontsize=12)
-        ax2.set_xlabel('Quantity')
-        ax2.set_ylabel('Price')
-        ax2.grid(True, alpha=0.3)
-        
-        plt.tight_layout()
-        return self._fig_to_base64(fig)
-    
-    async def generate_custom_economic_graph(self, graph_request: str) -> str:
-        """Generate custom economic graphs based on AI-parsed parameters"""
-        
-        # Use AI to parse the graph request and extract parameters
-        graph_params = await self._parse_graph_request(graph_request)
-        
-        if graph_params["type"] == "ppf":
-            return await self.generate_ppf_curve(
-                graph_params.get("good1", "Good X"),
-                graph_params.get("good2", "Good Y"),
-                graph_params.get("points")
-            )
-        elif graph_params["type"] == "supply_demand":
-            return await self.generate_supply_demand_curve(
-                graph_params.get("market", "Market"),
-                graph_params.get("equilibrium_price", 10),
-                graph_params.get("equilibrium_quantity", 100)
-            )
-        elif graph_params["type"] == "elasticity":
-            return await self.generate_elasticity_graph(
-                graph_params.get("demand_type", "elastic")
-            )
-        else:
-            # Default to supply and demand
-            return await self.generate_supply_demand_curve()
-    
-    async def _get_ppf_data_points(self, good1: str, good2: str) -> List[Tuple[float, float]]:
-        """Use AI to generate realistic PPF data points"""
-        
-        prompt = ChatPromptTemplate.from_template("""
-        Generate 5 realistic data points for a Production Possibilities Frontier (PPF) curve 
-        between {good1} and {good2}. 
-        
-        Return ONLY a JSON array of [x, y] coordinate pairs where:
-        - x represents units of {good1}
-        - y represents units of {good2}
-        - Points should show the trade-off between the two goods
-        - Points should be realistic for these goods
-        - Include corner points (maximum of each good)
-        
-        Example format: [[0, 100], [25, 80], [50, 60], [75, 35], [100, 0]]
-        """)
-        
-        chain = prompt | self.model | StrOutputParser()
-        response = await chain.ainvoke({"good1": good1, "good2": good2})
-        
+    async def generate_contextual_graph(self, content: str, context_title: str = "") -> Optional[Dict[str, Any]]:
+        """
+        Analyze content and generate an appropriate graph without assuming any specific domain
+        """
         try:
-            points = json.loads(response.strip())
-            return [(float(p[0]), float(p[1])) for p in points]
-        except:
-            # Fallback points
-            return [(0, 100), (25, 80), (50, 60), (75, 35), (100, 0)]
+            # Step 1: Analyze if visualization would help
+            should_visualize = await self._analyze_visualization_need(content, context_title)
+            
+            if not should_visualize["needs_visualization"]:
+                return None
+            
+            # Step 2: Extract the core relationship/concept to visualize
+            visualization_spec = await self._extract_visualization_concept(content, context_title, should_visualize)
+            
+            if not visualization_spec:
+                return None
+                
+            # Step 3: Generate the actual graph
+            image_base64 = await self._create_universal_graph(visualization_spec)
+            
+            if not image_base64:
+                return None
+            
+            # Cache the result
+            await graph_storage.store_graph(
+                visualization_spec.get("concept_type", "universal"), 
+                visualization_spec.get("parameters", {}), 
+                image_base64,
+                tags=visualization_spec.get("tags", ["universal"])
+            )
+            
+            return {
+                "type": visualization_spec.get("concept_type", "relationship"),
+                "image": image_base64,
+                "title": visualization_spec.get("title", "Conceptual Visualization"),
+                "description": visualization_spec.get("description", "Visual representation of the concepts discussed.")
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in universal graph generation: {e}")
+            return None
     
-    async def _parse_graph_request(self, request: str) -> Dict[str, Any]:
-        """Parse natural language graph request into parameters"""
+    async def _analyze_visualization_need(self, content: str, context_title: str) -> Dict[str, Any]:
+        """Determine if the content would benefit from visualization"""
         
         prompt = ChatPromptTemplate.from_template("""
-        Parse this graph request and return parameters as JSON:
-        "{request}"
+        Analyze this educational content to determine if it contains concepts that would benefit from visual representation.
         
-        Determine the graph type and extract relevant parameters:
+        Title: {context_title}
+        Content: {content}
         
-        Types: "ppf", "supply_demand", "elasticity"
+        Look for:
+        - Relationships between two or more variables/concepts
+        - Comparisons or trade-offs
+        - Processes or flows
+        - Trends, patterns, or changes over time/conditions
+        - Mathematical or logical relationships
+        - Abstract concepts that could be made concrete through visualization
         
-        Return JSON format:
+        Return JSON:
         {{
-            "type": "graph_type",
-            "good1": "first good name",
-            "good2": "second good name", 
-            "market": "market name",
-            "equilibrium_price": number,
-            "equilibrium_quantity": number,
-            "demand_type": "elastic" or "inelastic"
+            "needs_visualization": true/false,
+            "confidence": 0-100,
+            "primary_concepts": ["concept1", "concept2"],
+            "relationship_type": "positive/negative/inverse/cyclical/comparative/process/other",
+            "reasoning": "explanation of why visualization would help"
         }}
         
-        Only include relevant parameters for the detected graph type.
+        Be generous - if there are ANY relationships or concepts that could be clearer with a visual aid, suggest visualization.
         """)
         
         chain = prompt | self.model | StrOutputParser()
-        response = await chain.ainvoke({"request": request})
+        response = await chain.ainvoke({
+            "content": content[:2000],
+            "context_title": context_title
+        })
         
         try:
             return json.loads(response.strip())
         except:
-            return {"type": "supply_demand"}
+            return {"needs_visualization": False, "reasoning": "Failed to parse analysis"}
+    
+    async def _extract_visualization_concept(self, content: str, context_title: str, analysis: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Extract what specifically should be visualized and how"""
+        
+        prompt = ChatPromptTemplate.from_template("""
+        Based on this content and analysis, create a complete visualization specification.
+        
+        Content: {content}
+        Title: {context_title}
+        Analysis: {analysis}
+        
+        Create a visualization spec that captures the core relationship or concept. Return JSON:
+        {{
+            "concept_type": "descriptive name for what's being shown",
+            "title": "clear title for the graph",
+            "description": "what this visualization demonstrates",
+            "x_variable": {{
+                "name": "what goes on x-axis",
+                "unit": "unit of measurement if any",
+                "type": "continuous/discrete/categorical",
+                "range_description": "how the variable changes"
+            }},
+            "y_variable": {{
+                "name": "what goes on y-axis", 
+                "unit": "unit of measurement if any",
+                "type": "continuous/discrete/categorical",
+                "range_description": "how the variable changes"
+            }},
+            "relationship": {{
+                "type": "linear/curved/inverse/step/categorical/other",
+                "direction": "positive/negative/mixed",
+                "description": "describe the relationship in words"
+            }},
+            "key_points": [
+                {{
+                    "x_value": "description or approximate value",
+                    "y_value": "description or approximate value", 
+                    "significance": "why this point matters"
+                }}
+            ],
+            "visual_elements": [
+                {{
+                    "type": "line/curve/area/point/arrow/text",
+                    "purpose": "what it shows or emphasizes",
+                    "style": "color/pattern suggestions"
+                }}
+            ],
+            "parameters": {{}},
+            "tags": ["relevant", "keywords"]
+        }}
+        
+        Focus on the CORE relationship or concept, not specific domain knowledge.
+        Make it educational and directly tied to what the content is teaching.
+        """)
+        
+        chain = prompt | self.model | StrOutputParser()
+        response = await chain.ainvoke({
+            "content": content[:1500],
+            "context_title": context_title,
+            "analysis": json.dumps(analysis)
+        })
+        
+        try:
+            return json.loads(response.strip())
+        except Exception as e:
+            logger.error(f"Failed to parse visualization spec: {e}")
+            return None
+    
+    async def _create_universal_graph(self, spec: Dict[str, Any]) -> Optional[str]:
+        """Create a graph based on the universal specification"""
+        
+        try:
+            fig, ax = plt.subplots(figsize=(10, 8))
+            
+            # Extract variables
+            x_var = spec.get("x_variable", {})
+            y_var = spec.get("y_variable", {})
+            relationship = spec.get("relationship", {})
+            
+            # Generate data based on the relationship type
+            data = await self._generate_universal_data(x_var, y_var, relationship, spec)
+            
+            # Plot the main relationship
+            await self._plot_universal_relationship(ax, data, relationship, spec)
+            
+            # Add key points if specified
+            await self._add_key_points(ax, spec.get("key_points", []), data)
+            
+            # Add visual elements
+            await self._add_visual_elements(ax, spec.get("visual_elements", []), data)
+            
+            # Set labels and title
+            x_label = x_var.get("name", "X Variable")
+            y_label = y_var.get("name", "Y Variable")
+            
+            if x_var.get("unit"):
+                x_label += f" ({x_var['unit']})"
+            if y_var.get("unit"):
+                y_label += f" ({y_var['unit']})"
+            
+            ax.set_xlabel(x_label, fontsize=12)
+            ax.set_ylabel(y_label, fontsize=12)
+            ax.set_title(spec.get("title", "Conceptual Relationship"), fontsize=14, pad=20)
+            
+            # Formatting
+            ax.grid(True, alpha=0.3)
+            
+            return self._fig_to_base64(fig)
+            
+        except Exception as e:
+            logger.error(f"Error creating universal graph: {e}")
+            return None
+    
+    async def _generate_universal_data(self, x_var: Dict, y_var: Dict, relationship: Dict, spec: Dict) -> Dict[str, Any]:
+        """Generate appropriate data based on variable types and relationships"""
+        
+        # Determine data range and type
+        x_type = x_var.get("type", "continuous")
+        y_type = y_var.get("type", "continuous") 
+        rel_type = relationship.get("type", "linear")
+        direction = relationship.get("direction", "positive")
+        
+        if x_type == "continuous" and y_type == "continuous":
+            # Generate continuous data
+            x = np.linspace(0, 100, 100)
+            
+            if rel_type == "linear":
+                if direction == "positive":
+                    y = 0.8 * x + np.random.normal(0, 5, len(x))
+                elif direction == "negative":
+                    y = 100 - 0.8 * x + np.random.normal(0, 5, len(x))
+                else:  # mixed
+                    y = 50 + 30 * np.sin(x / 20) + np.random.normal(0, 3, len(x))
+            
+            elif rel_type == "curved":
+                if direction == "positive":
+                    y = 100 * (1 - np.exp(-x / 30)) + np.random.normal(0, 3, len(x))
+                elif direction == "negative":
+                    y = 100 * np.exp(-x / 30) + np.random.normal(0, 3, len(x))
+                else:
+                    y = 50 + 40 * np.sin(x / 15) * np.exp(-x / 100) + np.random.normal(0, 2, len(x))
+            
+            elif rel_type == "inverse":
+                y = 1000 / (x + 10) + np.random.normal(0, 2, len(x))
+            
+            else:  # other/step
+                y = 50 + 20 * np.sign(np.sin(x / 15)) + np.random.normal(0, 3, len(x))
+            
+            # Ensure y values are reasonable
+            y = np.maximum(y, 0)
+            
+        elif x_type == "categorical" or y_type == "categorical":
+            # Generate categorical data
+            categories = ["Category A", "Category B", "Category C", "Category D", "Category E"]
+            if direction == "positive":
+                values = [20, 35, 50, 65, 80]
+            elif direction == "negative":
+                values = [80, 65, 50, 35, 20]
+            else:
+                values = [30, 60, 45, 70, 40]
+            
+            return {"categories": categories, "values": values, "type": "categorical"}
+        
+        else:
+            # Discrete data
+            x = np.arange(0, 21)
+            y = np.random.poisson(5, len(x)) + x * 0.5
+        
+        return {"x": x, "y": y, "type": "continuous"}
+    
+    async def _plot_universal_relationship(self, ax, data: Dict, relationship: Dict, spec: Dict):
+        """Plot the main relationship"""
+        
+        if data.get("type") == "categorical":
+            ax.bar(data["categories"], data["values"], alpha=0.7, color='steelblue')
+        else:
+            rel_type = relationship.get("type", "linear")
+            
+            if rel_type in ["linear", "inverse"]:
+                ax.plot(data["x"], data["y"], 'b-', linewidth=2, alpha=0.8)
+            elif rel_type == "curved":
+                ax.plot(data["x"], data["y"], 'b-', linewidth=2, alpha=0.8)
+                # Add curve fitting if needed
+            else:
+                ax.scatter(data["x"], data["y"], alpha=0.6, s=30, color='steelblue')
+    
+    async def _add_key_points(self, ax, key_points: List[Dict], data: Dict):
+        """Add important points to highlight"""
+        
+        for point in key_points[:3]:  # Limit to 3 key points
+            try:
+                # For now, add points at approximate locations
+                if data.get("type") == "continuous":
+                    x_val = len(data["x"]) // 3  # Approximate position
+                    y_val = data["y"][x_val]
+                    ax.plot(data["x"][x_val], y_val, 'ro', markersize=8, zorder=5)
+                    ax.annotate(point.get("significance", "Key Point")[:30] + "...", 
+                               (data["x"][x_val], y_val), 
+                               xytext=(10, 10), textcoords='offset points',
+                               fontsize=9, ha='left',
+                               bbox=dict(boxstyle="round,pad=0.3", facecolor="yellow", alpha=0.7))
+            except:
+                continue
+    
+    async def _add_visual_elements(self, ax, elements: List[Dict], data: Dict):
+        """Add additional visual elements like arrows, areas, etc."""
+        
+        for element in elements[:2]:  # Limit visual elements
+            elem_type = element.get("type", "")
+            purpose = element.get("purpose", "")
+            
+            if elem_type == "arrow" and data.get("type") == "continuous":
+                # Add directional arrow
+                mid_idx = len(data["x"]) // 2
+                start_x, start_y = data["x"][mid_idx - 10], data["y"][mid_idx - 10]
+                end_x, end_y = data["x"][mid_idx + 10], data["y"][mid_idx + 10]
+                ax.annotate('', xy=(end_x, end_y), xytext=(start_x, start_y),
+                           arrowprops=dict(arrowstyle='->', lw=2, color='red', alpha=0.7))
+            
+            elif elem_type == "area" and data.get("type") == "continuous":
+                # Fill area under curve
+                ax.fill_between(data["x"], 0, data["y"], alpha=0.2, color='lightblue')
+            
+            elif elem_type == "text":
+                # Add explanatory text
+                ax.text(0.02, 0.98, purpose[:50], transform=ax.transAxes, 
+                       fontsize=10, verticalalignment='top',
+                       bbox=dict(boxstyle="round,pad=0.4", facecolor="wheat", alpha=0.8))
     
     def _fig_to_base64(self, fig) -> str:
         """Convert matplotlib figure to base64 string"""
@@ -339,4 +354,4 @@ class GraphGenerator:
         return image_base64
 
 # Global instance
-graph_generator = GraphGenerator()
+universal_graph_generator = UniversalGraphGenerator()
