@@ -1,0 +1,228 @@
+{
+  "type": "macro",
+  "units": {
+    "1": {
+      "title": "Basic Economic Concepts",
+      "chapters": [
+        {
+          "chapter_number": "1.1",
+          "title": "Scarcity, Choice, and Opportunity Cost",
+          "topics": [
+            "Scarcity: Limited resources vs unlimited wants in a macroeconomic context",
+            "Trade-offs in national policy decisions",
+            "Opportunity cost: Value of the next best alternative given up",
+            "Factors of production: Land, labor, capital, and entrepreneurship",
+            "Marginal analysis: Decision-making at the margin"
+          ]
+        },
+        {
+          "chapter_number": "1.2",
+          "title": "Production Possibilities Curve",
+          "topics": [
+            "PPC as a model of scarcity, choice, and efficiency",
+            "Points on, inside, and outside the curve",
+            "Law of increasing opportunity cost",
+            "Economic growth and PPC shifts",
+            "Productive efficiency vs allocative efficiency"
+          ]
+        },
+        {
+          "chapter_number": "1.3",
+          "title": "Comparative Advantage and Trade",
+          "topics": [
+            "Absolute vs comparative advantage",
+            "Specialization and gains from trade",
+            "Terms of trade and mutually beneficial exchange"
+          ]
+        },
+        {
+          "chapter_number": "1.4",
+          "title": "Economic Systems and the Circular Flow",
+          "topics": [
+            "Market, command, and mixed economies",
+            "Property rights and incentives",
+            "Circular flow model: interactions among households, firms, and government"
+          ]
+        }
+      ]
+    },
+    "2": {
+      "title": "Economic Indicators and the Business Cycle",
+      "chapters": [
+        {
+          "chapter_number": "2.1",
+          "title": "Measuring Economic Activity",
+          "topics": [
+            "Gross Domestic Product (GDP): definition and components",
+            "Nominal vs real GDP",
+            "GDP deflator and price indices"
+          ]
+        },
+        {
+          "chapter_number": "2.2",
+          "title": "Unemployment",
+          "topics": [
+            "Types of unemployment: frictional, structural, cyclical, seasonal",
+            "Natural rate of unemployment",
+            "Labor force participation rate"
+          ]
+        },
+        {
+          "chapter_number": "2.3",
+          "title": "Inflation",
+          "topics": [
+            "Price indices: CPI and GDP deflator",
+            "Calculating inflation rates",
+            "Costs of inflation: menu costs, shoe-leather costs, redistribution effects"
+          ]
+        },
+        {
+          "chapter_number": "2.4",
+          "title": "Business Cycle",
+          "topics": [
+            "Phases of the business cycle",
+            "Output gaps: recessionary and inflationary",
+            "Relationship between unemployment and GDP (Okun's Law)"
+          ]
+        }
+      ]
+    },
+    "3": {
+      "title": "National Income and Price Determination",
+      "chapters": [
+        {
+          "chapter_number": "3.1",
+          "title": "Aggregate Demand",
+          "topics": [
+            "Definition and components: C, I, G, NX",
+            "Shifters of aggregate demand",
+            "Wealth effect, interest rate effect, exchange rate effect"
+          ]
+        },
+        {
+          "chapter_number": "3.2",
+          "title": "Aggregate Supply",
+          "topics": [
+            "Short-run aggregate supply (SRAS)",
+            "Long-run aggregate supply (LRAS)",
+            "Shifters of SRAS and LRAS"
+          ]
+        },
+        {
+          "chapter_number": "3.3",
+          "title": "Macroeconomic Equilibrium",
+          "topics": [
+            "Short-run vs long-run equilibrium",
+            "Recessionary and inflationary gaps",
+            "Self-correction and adjustments in wages/prices"
+          ]
+        },
+        {
+          "chapter_number": "3.4",
+          "title": "Multiplier Effect",
+          "topics": [
+            "Spending multiplier",
+            "Tax multiplier",
+            "Impact of fiscal policy on aggregate demand"
+          ]
+        }
+      ]
+    },
+    "4": {
+      "title": "Financial Sector",
+      "chapters": [
+        {
+          "chapter_number": "4.1",
+          "title": "Money and Banking",
+          "topics": [
+            "Functions of money",
+            "Types of money: commodity, fiat",
+            "Money supply measures: M1, M2"
+          ]
+        },
+        {
+          "chapter_number": "4.2",
+          "title": "Financial Assets and Interest Rates",
+          "topics": [
+            "Bonds, stocks, and other financial instruments",
+            "Relationship between bond prices and interest rates",
+            "Loanable funds market"
+          ]
+        },
+        {
+          "chapter_number": "4.3",
+          "title": "Monetary Policy",
+          "topics": [
+            "Tools of monetary policy: reserve requirements, discount rate, open market operations",
+            "Expansionary vs contractionary monetary policy",
+            "Effects on interest rates, investment, and aggregate demand"
+          ]
+        }
+      ]
+    },
+    "5": {
+      "title": "Inflation, Unemployment, and Stabilization Policies",
+      "chapters": [
+        {
+          "chapter_number": "5.1",
+          "title": "Phillips Curve",
+          "topics": [
+            "Short-run Phillips curve: inflation-unemployment trade-off",
+            "Long-run Phillips curve: natural rate of unemployment",
+            "Shifts in Phillips curves"
+          ]
+        },
+        {
+          "chapter_number": "5.2",
+          "title": "Fiscal Policy",
+          "topics": [
+            "Government spending and taxation",
+            "Expansionary and contractionary fiscal policy",
+            "Crowding out and budget deficits"
+          ]
+        },
+        {
+          "chapter_number": "5.3",
+          "title": "Policy Mix and Limitations",
+          "topics": [
+            "Combining fiscal and monetary policy",
+            "Lags in policy implementation",
+            "Political and economic constraints"
+          ]
+        }
+      ]
+    },
+    "6": {
+      "title": "Open Economy: International Trade and Finance",
+      "chapters": [
+        {
+          "chapter_number": "6.1",
+          "title": "Balance of Payments",
+          "topics": [
+            "Current account and capital/financial account",
+            "Net exports and trade balance",
+            "Relationship between accounts"
+          ]
+        },
+        {
+          "chapter_number": "6.2",
+          "title": "Foreign Exchange Market",
+          "topics": [
+            "Exchange rates: appreciation and depreciation",
+            "Determinants of currency value",
+            "Effects on net exports"
+          ]
+        },
+        {
+          "chapter_number": "6.3",
+          "title": "Capital Flows and Interest Rates",
+          "topics": [
+            "Relationship between interest rates and capital flows",
+            "Loanable funds in an open economy",
+            "Global financial market interactions"
+          ]
+        }
+      ]
+    }
+  }
+}

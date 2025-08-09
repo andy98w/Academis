@@ -10,10 +10,10 @@ from typing import Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 def load_toc_from_file(subject: str) -> Optional[dict]:
-    """Load table of contents from JSON file in data directory"""
+    """Load table of contents from JSON file in toc directory"""
     try:
-        data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
-        toc_file = os.path.join(data_dir, f"{subject}_toc.json")
+        toc_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "toc")
+        toc_file = os.path.join(toc_dir, f"{subject}_toc.json")
         
         if os.path.exists(toc_file):
             with open(toc_file, 'r') as f:

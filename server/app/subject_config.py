@@ -8,7 +8,7 @@ class SubjectConfig:
             "name": "Microeconomics",
             "full_name": "AP Microeconomics",
             "description": "Study individual economic behavior, markets, and business decisions.",
-            "toc": None,  # Loaded from data/micro_toc.json
+            "toc": None,  # Loaded from toc/micro_toc.json
             "collection_prefix": "economics",
             "agent_prefix": "[Microeconomics Question]"
         },
@@ -16,7 +16,7 @@ class SubjectConfig:
             "name": "Macroeconomics", 
             "full_name": "AP Macroeconomics",
             "description": "Explore national economies, economic indicators, and government policies.",
-            "toc": None,  # Loaded from data/macro_toc.json
+            "toc": None,  # Loaded from toc/macro_toc.json
             "collection_prefix": "economics",
             "agent_prefix": "[Macroeconomics Question]"
         },

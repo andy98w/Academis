@@ -13,7 +13,6 @@ import {
   BreadcrumbLink,
   Divider,
   SimpleGrid,
-  Badge,
   Spinner,
   Alert,
   AlertIcon,
@@ -24,13 +23,12 @@ import {
   AccordionButton,
   AccordionPanel,
   AccordionIcon,
-  Icon,
   UnorderedList,
   ListItem,
-  Collapse,
 } from '@chakra-ui/react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { FaBook, FaArrowLeft, FaHome, FaCaretDown, FaCaretRight, FaChartLine } from 'react-icons/fa';
+import { FaBook, FaArrowLeft, FaHome, FaCaretDown, FaCaretRight, FaChartLine, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { Image } from '@chakra-ui/react';
 import axios from 'axios';
 import ChatInterface from '../components/ChatInterface';
 import IconWrapper, { renderIcon } from '../components/IconWrapper';
@@ -51,11 +49,19 @@ interface TextbookTOC {
   units: Record<string, Unit>;
 }
 
+interface GraphData {
+  type: string;
+  image: string;
+  title: string;
+  description: string;
+}
+
 interface UnitContent {
   type: string;
   units: Record<string, {
     title: string;
     chapters: Record<string, string[]>;
+    graphs?: Record<string, GraphData | Record<string | number, GraphData>>;
   }>;
 }
 
@@ -68,7 +74,6 @@ const TextbookPage: React.FC<TextbookPageProps> = ({ subject }) => {
   const navigate = useNavigate();
   const toast = useToast();
   const bgColor = useColorModeValue('white', 'gray.800');
-  const borderColor = useColorModeValue('gray.200', 'gray.700');
   const solutionsBgColor = useColorModeValue('blue.50', 'blue.900');
 
   // Get subject configuration
@@ -79,7 +84,6 @@ const TextbookPage: React.FC<TextbookPageProps> = ({ subject }) => {
   const [tableOfContents, setTableOfContents] = useState<TextbookTOC | null>(null);
   const [unitContent, setUnitContent] = useState<UnitContent | null>(null);
   const [chapterContent, setChapterContent] = useState<string[] | null>(null);
-  const [showChat, setShowChat] = useState(true);
   const [solutionVisibility, setSolutionVisibility] = useState<{[key: string]: boolean}>({});
   const [reviewQuestions, setReviewQuestions] = useState<{question: string, solution: string, id?: string}[]>([]);
 
@@ -216,6 +220,73 @@ const TextbookPage: React.FC<TextbookPageProps> = ({ subject }) => {
     return parseInt(id, 10);
   };
 
+  // Helper function to get all chapters in order
+  const getAllChaptersInOrder = () => {
+    if (!tableOfContents?.units) return [];
+    
+    const chapters: { unitId: string, chapterTitle: string, chapterNumber: string }[] = [];
+    
+    // Sort units by number and iterate through chapters
+    Object.entries(tableOfContents.units)
+      .sort(([aId], [bId]) => parseInt(aId) - parseInt(bId))
+      .forEach(([unitId, unit]) => {
+        if (unit.chapters && Array.isArray(unit.chapters)) {
+          unit.chapters.forEach((chapter) => {
+            chapters.push({
+              unitId,
+              chapterTitle: chapter.title,
+              chapterNumber: chapter.chapter_number
+            });
+          });
+        }
+      });
+    
+    return chapters;
+  };
+
+  // Helper function to get current chapter index
+  const getCurrentChapterIndex = () => {
+    if (!chapterId) return -1;
+    const allChapters = getAllChaptersInOrder();
+    return allChapters.findIndex(chapter => 
+      chapter.chapterTitle.toLowerCase().includes(chapterId.toLowerCase()) ||
+      chapterId.toLowerCase().includes(chapter.chapterTitle.toLowerCase())
+    );
+  };
+
+  // Helper function to get previous chapter
+  const getPreviousChapter = () => {
+    const allChapters = getAllChaptersInOrder();
+    const currentIndex = getCurrentChapterIndex();
+    
+    if (currentIndex <= 0) return null;
+    return allChapters[currentIndex - 1];
+  };
+
+  // Helper function to get next chapter
+  const getNextChapter = () => {
+    const allChapters = getAllChaptersInOrder();
+    const currentIndex = getCurrentChapterIndex();
+    
+    if (currentIndex === -1 || currentIndex >= allChapters.length - 1) return null;
+    return allChapters[currentIndex + 1];
+  };
+
+  // Navigation functions
+  const navigateToPreviousChapter = () => {
+    const prevChapter = getPreviousChapter();
+    if (prevChapter) {
+      navigate(`/textbook/${subject}/unit/${prevChapter.unitId}/chapter/${encodeURIComponent(prevChapter.chapterTitle)}`);
+    }
+  };
+
+  const navigateToNextChapter = () => {
+    const nextChapter = getNextChapter();
+    if (nextChapter) {
+      navigate(`/textbook/${subject}/unit/${nextChapter.unitId}/chapter/${encodeURIComponent(nextChapter.chapterTitle)}`);
+    }
+  };
+
   // Render breadcrumbs navigation
   const renderBreadcrumbs = () => {
     return (
@@ -322,6 +393,205 @@ This textbook covers all the essential concepts and topics for the {subjectConfi
     );
   };
 
+  // Render graph component
+  const renderGraph = (graphData: GraphData) => {
+    return (
+      <Box mt={6} mb={6} p={4} bg="gray.50" borderRadius="md" borderWidth="1px">
+        <HStack mb={3} spacing={2}>
+          <IconWrapper icon={FaChartLine} size={20} />
+          <Heading as="h5" size="sm">
+            {graphData.title || 'Economic Graph'}
+          </Heading>
+        </HStack>
+        {graphData.description && (
+          <Text mb={3} fontSize="sm" color="gray.600">
+            {graphData.description}
+          </Text>
+        )}
+        <Image 
+          src={`data:image/png;base64,${graphData.image}`}
+          alt={graphData.title || 'Economic Graph'}
+          maxW={{ base: "100%", md: "600px" }}
+          height="auto"
+          borderRadius="md"
+          boxShadow="sm"
+          mx="auto"
+          display="block"
+        />
+      </Box>
+    );
+  };
+  
+  // Render all graphs for the chapter
+  const renderAllChapterGraphs = () => {
+    if (!unitContent || !unitId || !chapterId) return null;
+    
+    const unit = unitContent.units[unitId];
+    if (!unit || !unit.graphs) return null;
+    
+    // Find the chapter key that matches our current chapter
+    const chapterKeys = Object.keys(unit.chapters);
+    const matchingChapterKey = chapterKeys.find(title => 
+      title.toLowerCase().includes(chapterId.toLowerCase())
+    );
+    
+    if (!matchingChapterKey) return null;
+    
+    // Try to find the chapter number
+    let chapterNumber = null;
+    const chapterNumMatch = matchingChapterKey.match(/^(\d+\.\d+)/);
+    if (chapterNumMatch) {
+      chapterNumber = chapterNumMatch[1];
+    } else if (chapterId) {
+      const chapterIdMatch = chapterId.match(/(\d+\.\d+)/);
+      if (chapterIdMatch) {
+        chapterNumber = chapterIdMatch[1];
+      }
+    }
+    
+    // If no chapter number found, use first available
+    if (!chapterNumber && unit.graphs) {
+      const availableKeys = Object.keys(unit.graphs);
+      if (availableKeys.length > 0) {
+        chapterNumber = availableKeys[0];
+      }
+    }
+    
+    if (!chapterNumber || !unit.graphs[chapterNumber]) return null;
+    
+    const chapterGraphs = unit.graphs[chapterNumber];
+    
+    // Check if this is the new multi-graph format (has 'main' or numeric keys)
+    if (typeof chapterGraphs === 'object' && !(chapterGraphs as GraphData).type) {
+      // New format: graphs stored by paragraph index or 'main'
+      const graphsMap = chapterGraphs as Record<string | number, GraphData>;
+      const graphElements: React.ReactElement[] = [];
+      
+      // Add all graphs from the map
+      Object.entries(graphsMap).forEach(([key, graph]) => {
+        graphElements.push(
+          <Box key={key}>
+            {renderGraph(graph)}
+          </Box>
+        );
+      });
+      
+      return <>{graphElements}</>;
+    } else {
+      // Old format: single graph object
+      const graphData = chapterGraphs as GraphData;
+      return renderGraph(graphData);
+    }
+  };
+  
+  // Get graph for a specific paragraph index
+  const getGraphForParagraph = (paragraphIndex: number) => {
+    if (!unitContent || !unitId || !chapterId) return null;
+    
+    const unit = unitContent.units[unitId];
+    if (!unit || !unit.graphs) {
+      console.log('No graphs in unit');
+      return null;
+    }
+    
+    // Find the chapter key that matches our current chapter
+    const chapterKeys = Object.keys(unit.chapters);
+    const matchingChapterKey = chapterKeys.find(title => 
+      title.toLowerCase().includes(chapterId.toLowerCase())
+    );
+    
+    if (!matchingChapterKey) return null;
+    
+    // Try to find the chapter number
+    let chapterNumber = null;
+    const chapterNumMatch = matchingChapterKey.match(/^(\d+\.\d+)/);
+    if (chapterNumMatch) {
+      chapterNumber = chapterNumMatch[1];
+    } else if (chapterId) {
+      const chapterIdMatch = chapterId.match(/(\d+\.\d+)/);
+      if (chapterIdMatch) {
+        chapterNumber = chapterIdMatch[1];
+      }
+    }
+    
+    // If no chapter number found, use first available
+    if (!chapterNumber && unit.graphs) {
+      const availableKeys = Object.keys(unit.graphs);
+      if (availableKeys.length > 0) {
+        chapterNumber = availableKeys[0];
+      }
+    }
+    
+    if (!chapterNumber || !unit.graphs[chapterNumber]) {
+      console.log('No graph for chapter number:', chapterNumber, 'Available:', Object.keys(unit.graphs));
+      return null;
+    }
+    
+    const chapterGraphs = unit.graphs[chapterNumber];
+    console.log('Chapter graphs:', chapterGraphs);
+    
+    // Check if this is the new multi-graph format (has 'main' or numeric keys)
+    if (typeof chapterGraphs === 'object' && !(chapterGraphs as GraphData).type) {
+      // New format: graphs stored by paragraph index or 'main'
+      const graphsMap = chapterGraphs as Record<string | number, GraphData>;
+      
+      // First check for paragraph-specific graph
+      if (graphsMap[paragraphIndex]) {
+        console.log('Found graph for paragraph index:', paragraphIndex);
+        return graphsMap[paragraphIndex];
+      }
+      
+      // If there's a 'main' graph, find the first paragraph with graph keywords
+      if (graphsMap['main'] && chapterContent) {
+        // Find the first paragraph that mentions graph-related keywords
+        let firstGraphParagraph = -1;
+        for (let i = 0; i < chapterContent.length; i++) {
+          const para = chapterContent[i].toLowerCase();
+          if (para.includes('graph') || 
+              para.includes('curve') ||
+              para.includes('visualized') ||
+              para.includes('illustrated') ||
+              para.includes('diagram') ||
+              para.includes('chart') ||
+              para.includes('model') ||
+              para.includes('ppf') ||
+              para.includes('trade-off')) {
+            firstGraphParagraph = i;
+            break;
+          }
+        }
+        
+        // Only show the graph at the first paragraph that mentions it
+        if (firstGraphParagraph === paragraphIndex) {
+          console.log('Showing main graph at paragraph', paragraphIndex);
+          return graphsMap['main'];
+        }
+      }
+      
+      return null;
+    } else {
+      // Old format: single graph object
+      const graphData = chapterGraphs as GraphData;
+      // For backwards compatibility with old format, look for generic graph/visualization keywords
+      if (chapterContent && chapterContent[paragraphIndex]) {
+        const paragraph = chapterContent[paragraphIndex].toLowerCase();
+        // Look for generic visualization/graph mentions
+        if (paragraph.includes('graph') || 
+            paragraph.includes('curve') ||
+            paragraph.includes('visualized') ||
+            paragraph.includes('illustrated') ||
+            paragraph.includes('diagram') ||
+            paragraph.includes('chart') ||
+            paragraph.includes('model')) {
+          console.log('Found graph keyword in paragraph', paragraphIndex);
+          return graphData;
+        }
+      }
+    }
+    
+    return null;
+  };
+
   // Render a specific unit's content
   const renderUnitContent = () => {
     if (!unitContent || !unitId || !unitContent.units[unitId]) return null;
@@ -412,6 +682,18 @@ This textbook covers all the essential concepts and topics for the {subjectConfi
                       <Heading as="h4" size="md" mt={idx > 0 ? 8 : 0} mb={4} key={idx} color="green.600">
                         {headingText}
                       </Heading>
+                    );
+                  }
+                  
+                  // Economic Analysis and Models - display all graphs after this section
+                  if (headingText === 'Economic Analysis and Models') {
+                    return (
+                      <React.Fragment key={idx}>
+                        <Heading as="h4" size="md" mt={idx > 0 ? 8 : 0} mb={4}>
+                          {headingText}
+                        </Heading>
+                        {renderAllChapterGraphs()}
+                      </React.Fragment>
                     );
                   }
                   
@@ -514,10 +796,40 @@ This textbook covers all the essential concepts and topics for the {subjectConfi
                     chapterContent.indexOf(paragraph) > conclusionHeadingIndex && 
                     (reviewQuestionsIndex === -1 || chapterContent.indexOf(paragraph) < reviewQuestionsIndex);
                   
+                  
                   // Special styling for Introduction and Conclusion paragraphs
                   if (isIntroductionParagraph) {
                     return (
-                      <Text key={idx} mb={4} borderLeft="4px solid" borderColor="blue.100" pl={3} bg="blue.50" p={2} borderRadius="md">
+                      <React.Fragment key={idx}>
+                        <Text mb={4} borderLeft="4px solid" borderColor="blue.100" pl={3} bg="blue.50" p={2} borderRadius="md">
+                          {parts.map((part, partIdx) => {
+                            if (part.startsWith('**') && part.endsWith('**')) {
+                              return <Text as="span" fontWeight="bold" color="blue.700" key={partIdx}>{part.slice(2, -2)}</Text>;
+                            }
+                            return part;
+                          })}
+                        </Text>
+                      </React.Fragment>
+                    );
+                  } else if (isConclusionParagraph) {
+                    return (
+                      <React.Fragment key={idx}>
+                        <Text mb={4} borderLeft="4px solid" borderColor="green.100" pl={3} bg="green.50" p={2} borderRadius="md">
+                          {parts.map((part, partIdx) => {
+                            if (part.startsWith('**') && part.endsWith('**')) {
+                              return <Text as="span" fontWeight="bold" color="green.700" key={partIdx}>{part.slice(2, -2)}</Text>;
+                            }
+                            return part;
+                          })}
+                        </Text>
+                      </React.Fragment>
+                    );
+                  }
+                  
+                  // Regular paragraph styling
+                  return (
+                    <React.Fragment key={idx}>
+                      <Text mb={4}>
                         {parts.map((part, partIdx) => {
                           if (part.startsWith('**') && part.endsWith('**')) {
                             return <Text as="span" fontWeight="bold" color="blue.700" key={partIdx}>{part.slice(2, -2)}</Text>;
@@ -525,30 +837,7 @@ This textbook covers all the essential concepts and topics for the {subjectConfi
                           return part;
                         })}
                       </Text>
-                    );
-                  } else if (isConclusionParagraph) {
-                    return (
-                      <Text key={idx} mb={4} borderLeft="4px solid" borderColor="green.100" pl={3} bg="green.50" p={2} borderRadius="md">
-                        {parts.map((part, partIdx) => {
-                          if (part.startsWith('**') && part.endsWith('**')) {
-                            return <Text as="span" fontWeight="bold" color="green.700" key={partIdx}>{part.slice(2, -2)}</Text>;
-                          }
-                          return part;
-                        })}
-                      </Text>
-                    );
-                  }
-                  
-                  // Regular paragraph styling
-                  return (
-                    <Text key={idx} mb={4}>
-                      {parts.map((part, partIdx) => {
-                        if (part.startsWith('**') && part.endsWith('**')) {
-                          return <Text as="span" fontWeight="bold" color="blue.700" key={partIdx}>{part.slice(2, -2)}</Text>;
-                        }
-                        return part;
-                      })}
-                    </Text>
+                    </React.Fragment>
                   );
                 }
               })}
@@ -560,9 +849,6 @@ This textbook covers all the essential concepts and topics for the {subjectConfi
     );
   };
 
-  // Toggle the chat visibility
-  const toggleChat = () => setShowChat(!showChat);
-  
   // Render the review questions section
   const renderReviewQuestions = () => {
     if (reviewQuestions.length === 0) return null;
@@ -642,6 +928,67 @@ This textbook covers all the essential concepts and topics for the {subjectConfi
         )}
       </Container>
       
+      {/* Floating Navigation Arrows - only show when viewing a specific chapter */}
+      {chapterId && (
+        <>
+          {/* Previous Chapter Arrow */}
+          {getPreviousChapter() && (
+            <Box
+              position="fixed"
+              bottom="50%"
+              left="20px"
+              transform="translateY(50%)"
+              zIndex={1000}
+            >
+              <Button
+                onClick={navigateToPreviousChapter}
+                colorScheme="blue"
+                variant="solid"
+                size="lg"
+                borderRadius="full"
+                boxShadow="lg"
+                _hover={{ transform: "scale(1.1)" }}
+                transition="all 0.2s"
+                p={4}
+                minW="auto"
+                h="60px"
+                w="60px"
+              >
+                <IconWrapper icon={FaChevronLeft} size={20} />
+              </Button>
+            </Box>
+          )}
+          
+          {/* Next Chapter Arrow */}
+          {getNextChapter() && (
+            <Box
+              position="fixed"
+              bottom="50%"
+              right="20px"
+              transform="translateY(50%)"
+              zIndex={1000}
+            >
+              <Button
+                onClick={navigateToNextChapter}
+                colorScheme="blue"
+                variant="solid"
+                size="lg"
+                borderRadius="full"
+                boxShadow="lg"
+                _hover={{ transform: "scale(1.1)" }}
+                transition="all 0.2s"
+                p={4}
+                minW="auto"
+                h="60px"
+                w="60px"
+              >
+                <IconWrapper icon={FaChevronRight} size={20} />
+              </Button>
+            </Box>
+          )}
+        </>
+      )}
+
       {/* Floating Chat Interface */}
       <ChatInterface 
         subject={subject} 

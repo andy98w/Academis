@@ -1,0 +1,238 @@
+{
+  "type": "micro",
+  "units": {
+    "1": {
+      "title": "Basic Economic Concepts",
+      "chapters": [
+        {
+          "chapter_number": "1.1", 
+          "title": "Scarcity, Choice, and Opportunity Cost",
+          "topics": [
+            "Scarcity: Limited resources relative to unlimited wants",
+            "Trade-offs: Choosing one option means giving up another",
+            "Opportunity cost: Value of the next best alternative given up",
+            "Factors of production: Land, labor, capital, and entrepreneurship",
+            "Scarcity vs. shortage: Scarcity is permanent, shortage is temporary"
+          ]
+        },
+        {
+          "chapter_number": "1.2", 
+          "title": "Production Possibilities Curve",
+          "topics": [
+            "Production Possibilities Curve (PPC): Graph showing trade-offs between two goods",
+            "PPC interpretation: Points on, inside, and outside the curve",
+            "Opportunity cost calculation: Using PPC to determine what is given up",
+            "Law of increasing opportunity cost: Why the PPC is typically bowed outward",
+            "Economic growth: Shifts in the PPC due to changes in resources or technology",
+            "Economic efficiency: Productive efficiency vs. allocative efficiency"
+          ]
+        },
+        {
+          "chapter_number": "1.3", 
+          "title": "Comparative Advantage and Trade",
+          "topics": [
+            "Absolute advantage: Ability to produce more of a good with the same resources",
+            "Comparative advantage: Ability to produce a good at lower opportunity cost",
+            "Specialization: Focusing production on goods where you have comparative advantage",
+            "Gains from trade: How specialization and trade benefit all parties",
+            "Terms of trade: Acceptable exchange rates between trading partners"
+          ]
+        },
+        {
+          "chapter_number": "1.4", 
+          "title": "Economic Systems",
+          "topics": [
+            "Traditional economy: Decisions based on customs and traditions",
+            "Command economy: Central authority makes economic decisions",
+            "Market economy: Decisions made by individuals and firms through price signals",
+            "Mixed economy: Combination of market mechanisms and government intervention",
+            "Property rights: Legal ownership and control over resources and goods"
+          ]
+        },
+        {
+          "chapter_number": "1.5", 
+          "title": "Marginal Analysis",
+          "topics": [
+            "Marginal benefit: Additional benefit from one more unit",
+            "Marginal cost: Additional cost from one more unit",
+            "Decision rule: MB = MC for optimal decisions",
+            "Rational decision-making and resource allocation"
+          ]
+        }
+      ]
+    },
+    "2": {
+      "title": "Supply and Demand",
+      "chapters": [
+        {
+          "chapter_number": "2.1", 
+          "title": "Demand",
+          "topics": [
+            "Law of demand: Inverse relationship between price and quantity demanded",
+            "Determinants of demand (shifters): Income, tastes, prices of related goods, expectations, number of buyers",
+            "Change in demand vs. change in quantity demanded"
+          ]
+        },
+        {
+          "chapter_number": "2.2", 
+          "title": "Supply",
+          "topics": [
+            "Law of supply: Direct relationship between price and quantity supplied",
+            "Determinants of supply (shifters): Input prices, technology, expectations, number of sellers, government policies",
+            "Change in supply vs. change in quantity supplied"
+          ]
+        },
+        {
+          "chapter_number": "2.3", 
+          "title": "Market Equilibrium",
+          "topics": [
+            "Equilibrium price and quantity",
+            "Surplus and shortage",
+            "Effects of shifts in supply and/or demand"
+          ]
+        },
+        {
+          "chapter_number": "2.4", 
+          "title": "Price Controls",
+          "topics": [
+            "Price ceiling: Maximum legal price, potential shortages",
+            "Price floor: Minimum legal price, potential surpluses",
+            "Deadweight loss from price controls"
+          ]
+        },
+        {
+          "chapter_number": "2.5", 
+          "title": "Elasticity",
+          "topics": [
+            "Price elasticity of demand: Responsiveness of quantity demanded to price changes",
+            "Price elasticity of supply: Responsiveness of quantity supplied to price changes",
+            "Income elasticity and cross-price elasticity",
+            "Elastic vs. inelastic demand and supply"
+          ]
+        },
+        {
+          "chapter_number": "2.6", 
+          "title": "Consumer and Producer Surplus",
+          "topics": [
+            "Consumer surplus: Difference between willingness to pay and actual price",
+            "Producer surplus: Difference between price received and minimum acceptable price",
+            "Allocative efficiency at equilibrium"
+          ]
+        }
+      ]
+    },
+    "3": {
+      "title": "Production, Cost, and the Perfect Competition Model",
+      "chapters": [
+        {
+          "chapter_number": "3.1",
+          "title": "Production and Costs",
+          "topics": [
+            "Short run vs. long run",
+            "Law of diminishing marginal returns",
+            "Total, average, and marginal product",
+            "Total, average, and marginal costs"
+          ]
+        },
+        {
+          "chapter_number": "3.2",
+          "title": "Perfect Competition",
+          "topics": [
+            "Characteristics of perfectly competitive markets",
+            "Profit maximization: MR = MC rule",
+            "Short-run vs. long-run equilibrium",
+            "Shutdown rule and break-even point"
+          ]
+        }
+      ]
+    },
+    "4": {
+      "title": "Imperfect Competition",
+      "chapters": [
+        {
+          "chapter_number": "4.1",
+          "title": "Monopoly",
+          "topics": [
+            "Sources of monopoly power",
+            "Monopoly pricing and output",
+            "Inefficiency and deadweight loss",
+            "Price discrimination"
+          ]
+        },
+        {
+          "chapter_number": "4.2",
+          "title": "Monopolistic Competition",
+          "topics": [
+            "Characteristics of monopolistic competition",
+            "Short-run vs. long-run equilibrium",
+            "Excess capacity and inefficiency"
+          ]
+        },
+        {
+          "chapter_number": "4.3",
+          "title": "Oligopoly",
+          "topics": [
+            "Interdependence among firms",
+            "Collusion and cartels",
+            "Game theory: dominant strategy and Nash equilibrium"
+          ]
+        }
+      ]
+    },
+    "5": {
+      "title": "Factor Markets",
+      "chapters": [
+        {
+          "chapter_number": "5.1",
+          "title": "Demand and Supply for Factors",
+          "topics": [
+            "Derived demand for resources",
+            "Marginal revenue product (MRP)",
+            "Optimal hiring rule: MRP = MRC"
+          ]
+        },
+        {
+          "chapter_number": "5.2",
+          "title": "Factor Market Structures",
+          "topics": [
+            "Perfect competition in factor markets",
+            "Monopsony and wage setting",
+            "Labor unions and wage determination"
+          ]
+        }
+      ]
+    },
+    "6": {
+      "title": "Market Failure and the Role of Government",
+      "chapters": [
+        {
+          "chapter_number": "6.1",
+          "title": "Externalities",
+          "topics": [
+            "Negative externalities: overproduction, market inefficiency",
+            "Positive externalities: underproduction, market inefficiency",
+            "Corrective policies: taxes, subsidies, regulation"
+          ]
+        },
+        {
+          "chapter_number": "6.2",
+          "title": "Public Goods and Common Resources",
+          "topics": [
+            "Characteristics of public goods: nonrivalrous and nonexcludable",
+            "Free-rider problem",
+            "Tragedy of the commons"
+          ]
+        },
+        {
+          "chapter_number": "6.3",
+          "title": "Government Intervention",
+          "topics": [
+            "Antitrust policy and promoting competition",
+            "Regulation of natural monopolies",
+            "Equity vs. efficiency trade-offs"
+          ]
+        }
+      ]
+    }
+  }
+}
