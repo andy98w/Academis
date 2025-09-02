@@ -9,7 +9,7 @@ from pymongo.server_api import ServerApi
 from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
-load_dotenv()
+load_dotenv(override=True)
 
 class GraphStorage:
     def __init__(self):

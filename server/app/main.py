@@ -12,7 +12,7 @@ import asyncio
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-load_dotenv()
+load_dotenv(override=True)
 
 app = FastAPI(title="Academis AP Economics API")
 app.add_middleware(

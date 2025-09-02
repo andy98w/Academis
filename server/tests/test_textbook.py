@@ -7,6 +7,7 @@ import sys
 import os
 import asyncio
 sys.path.insert(0, '/Users/andywu/Academis/server')
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.rag_service import db
 from app.textbook_service import generate_textbook_content
@@ -146,4 +147,4 @@ def check_sections(subject: str, unit: int, chapter: str):
 
 if __name__ == "__main__":
     # Example usage - regenerate micro Unit 1.1
-    asyncio.run(regenerate_chapter("micro", 1, "1.1"))
+    asyncio.run(regenerate_chapter("micro", 1, "1.2"))

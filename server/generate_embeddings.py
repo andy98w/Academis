@@ -15,7 +15,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-load_dotenv()
+load_dotenv(override=True)
 
 async def generate_embeddings_for_collection():
     """Generate embeddings for all documents that don't have them"""

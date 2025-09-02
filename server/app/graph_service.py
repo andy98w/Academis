@@ -23,7 +23,7 @@ from langchain.prompts import ChatPromptTemplate
 from dotenv import load_dotenv
 from .graph_storage import graph_storage
 
-load_dotenv()
+load_dotenv(override=True)
 logger = logging.getLogger(__name__)
 
 # Set matplotlib to use non-interactive backend
@@ -41,7 +41,7 @@ class UniversalGraphGenerator:
         try:
             # Step 1: Analyze if visualization would help
             should_visualize = await self._analyze_visualization_need(content, context_title)
-            
+            should_visualize["needs_visualization"] = True
             if not should_visualize["needs_visualization"]:
                 return None
             
@@ -112,8 +112,15 @@ class UniversalGraphGenerator:
         })
         
         try:
-            return json.loads(response.strip())
-        except:
+            # Handle markdown-wrapped JSON responses
+            cleaned_response = response.strip()
+            if cleaned_response.startswith('```json'):
+                cleaned_response = cleaned_response[7:]  # Remove ```json
+            if cleaned_response.endswith('```'):
+                cleaned_response = cleaned_response[:-3]  # Remove trailing ```
+            return json.loads(cleaned_response.strip())
+        except Exception as e:
+            logger.error(f"Failed to parse analysis response: {e}")
             return {"needs_visualization": False, "reasoning": "Failed to parse analysis"}
     
     async def _extract_visualization_concept(self, content: str, context_title: str, analysis: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -178,7 +185,13 @@ class UniversalGraphGenerator:
         })
         
         try:
-            return json.loads(response.strip())
+            # Handle markdown-wrapped JSON responses
+            cleaned_response = response.strip()
+            if cleaned_response.startswith('```json'):
+                cleaned_response = cleaned_response[7:]  # Remove ```json
+            if cleaned_response.endswith('```'):
+                cleaned_response = cleaned_response[:-3]  # Remove trailing ```
+            return json.loads(cleaned_response.strip())
         except Exception as e:
             logger.error(f"Failed to parse visualization spec: {e}")
             return None

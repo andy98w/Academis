@@ -9,7 +9,7 @@ from langchain.tools import Tool
 from langchain_community.tools.tavily_search import TavilySearchResults
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 logger = logging.getLogger(__name__)
 

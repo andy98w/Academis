@@ -9,7 +9,7 @@ from langchain_mongodb import MongoDBAtlasVectorSearch
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 
-load_dotenv()
+load_dotenv(override=True)
 
 MONGODB_URI = os.getenv("MONGODB_URI")
 if not MONGODB_URI:

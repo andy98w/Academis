@@ -3,6 +3,9 @@ import logging
 from typing import List
 import datetime
 import os
+from dotenv import load_dotenv
+
+load_dotenv(override=True)
 from .helpers import (
     load_toc_from_file,
     get_chapter_content_with_preview,
@@ -12,9 +15,6 @@ from .helpers import (
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
-
 
 
 async def get_textbook_toc(subject: str) -> dict:
@@ -103,7 +103,6 @@ async def get_textbook_content(subject: str, unit: int = None, chapter: str = No
 
 async def generate_textbook_content(subject: str, unit: int, chapter: str) -> List[str]:
     from .subject_config import SubjectConfig
-    import os
     
     logger.info(f"Getting/generating content for {subject} Unit {unit}, Chapter {chapter}")
     
@@ -227,7 +226,7 @@ async def generate_textbook_content(subject: str, unit: int, chapter: str) -> Li
             "chapter": chapter,
             "chapter_title": chapter_title,
             "content": paragraphs,
-            "generated_at": datetime.datetime.utcnow()
+            "generated_at": datetime.datetime.now(datetime.timezone.utc)
         }
         
         # Include graph data if available

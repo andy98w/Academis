@@ -14,7 +14,7 @@ import traceback
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-load_dotenv()
+load_dotenv(override=True)
 
 MONGODB_URI = os.getenv("MONGODB_URI")
 if MONGODB_URI:
