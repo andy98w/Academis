@@ -1097,16 +1097,23 @@ This textbook covers all the essential concepts and topics for the {subjectConfi
   return (
     <Box minH="100vh" bg="gray.50" position="relative">
       <Container maxW="6xl" py={6}>
-        <Button 
-          leftIcon={<IconWrapper icon={FaArrowLeft} size={14} />}
-          onClick={() => navigate('/')}
-          colorScheme="blue" 
-          variant="outline" 
-          mb={6}
-        >
-          Back to Home
-        </Button>
-        
+        <HStack spacing={4} mb={6}>
+          <Button
+            leftIcon={<IconWrapper icon={FaArrowLeft} size={14} />}
+            onClick={() => navigate('/')}
+            colorScheme="blue"
+            variant="outline"
+          >
+            Back to Home
+          </Button>
+          <Button
+            colorScheme="purple"
+            onClick={() => navigate(`/practice/${subject}`)}
+          >
+            Practice Questions
+          </Button>
+        </HStack>
+
         {renderBreadcrumbs()}
         
         {loading ? (

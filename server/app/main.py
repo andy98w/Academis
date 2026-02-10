@@ -311,6 +311,53 @@ async def generate_quiz(subject: str, request: GenerateQuizRequest):
         logger.error(f"Error generating quiz: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/quiz/{subject}/all", response_model=dict)
+async def get_all_quizzes(subject: str):
+    """Get all quiz questions for a subject (from all chapters)"""
+    if not SubjectConfig.is_valid_subject(subject):
+        raise HTTPException(status_code=400, detail=f"Invalid subject: {subject}")
+
+    try:
+        from .rag_service import db
+        from .textbook_service import get_textbook_toc
+
+        if db is None:
+            raise HTTPException(status_code=500, detail="Database not available")
+
+        # Get TOC for chapter titles
+        toc = await get_textbook_toc(subject)
+
+        # Get all chapters with quizzes
+        textbook_collection = db.textbook_content
+        chapters_with_quiz = textbook_collection.find(
+            {"subject": subject, "quiz": {"$exists": True, "$ne": []}},
+            {"chapter_id": 1, "chapter_title": 1, "unit": 1, "quiz": 1, "_id": 0}
+        )
+
+        all_questions = []
+        for doc in chapters_with_quiz:
+            chapter_id = doc.get("chapter_id", "")
+            chapter_title = doc.get("chapter_title", "")
+            unit = doc.get("unit", 0)
+            unit_title = toc.get("units", {}).get(unit, {}).get("title", f"Unit {unit}")
+
+            for q in doc.get("quiz", []):
+                q["chapter_id"] = chapter_id
+                q["chapter_title"] = chapter_title
+                q["unit"] = unit
+                q["unit_title"] = unit_title
+                all_questions.append(q)
+
+        return {
+            "subject": subject,
+            "total_questions": len(all_questions),
+            "questions": all_questions
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting all quizzes: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/quiz/{subject}/{chapter_id}", response_model=dict)
 async def get_quiz(subject: str, chapter_id: str):
     """Get quiz questions for a chapter"""

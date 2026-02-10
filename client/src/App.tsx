@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import SubjectPage from './pages/SubjectPage';
 import TextbookPage from './pages/TextbookPage';
+import PracticePage from './pages/PracticePage';
 import { getSubjectConfig } from './config/subjects';
 import './App.css';
 
@@ -26,7 +27,7 @@ const SubjectPageWrapper: React.FC = () => {
 
 const TextbookPageWrapper: React.FC = () => {
   const { subject } = useParams<{ subject: string }>();
-  
+
   if (!subject) {
     return <div>Subject not specified</div>;
   }
@@ -35,6 +36,21 @@ const TextbookPageWrapper: React.FC = () => {
     // Validate subject exists
     getSubjectConfig(subject);
     return <TextbookPage subject={subject} />;
+  } catch (error) {
+    return <div>Subject not found: {subject}</div>;
+  }
+};
+
+const PracticePageWrapper: React.FC = () => {
+  const { subject } = useParams<{ subject: string }>();
+
+  if (!subject) {
+    return <div>Subject not specified</div>;
+  }
+
+  try {
+    getSubjectConfig(subject);
+    return <PracticePage subject={subject} />;
   } catch (error) {
     return <div>Subject not found: {subject}</div>;
   }
@@ -53,6 +69,7 @@ function App() {
             <Route path="/textbook/:subject" element={<TextbookPageWrapper />} />
             <Route path="/textbook/:subject/unit/:unitId" element={<TextbookPageWrapper />} />
             <Route path="/textbook/:subject/unit/:unitId/chapter/:chapterId" element={<TextbookPageWrapper />} />
+            <Route path="/practice/:subject" element={<PracticePageWrapper />} />
             
             {/* Catch-all for unknown routes */}
             <Route path="*" element={<div>Page not found</div>} />
