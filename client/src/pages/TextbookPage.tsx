@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Box,
   Container,
@@ -25,9 +25,16 @@ import {
   AccordionIcon,
   UnorderedList,
   ListItem,
+  Table,
+  Thead,
+  Tbody,
+  Tr,
+  Th,
+  Td,
+  TableContainer,
 } from '@chakra-ui/react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { FaBook, FaArrowLeft, FaHome, FaCaretDown, FaCaretRight, FaChartLine, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { FaBook, FaArrowLeft, FaHome, FaCaretDown, FaCaretRight, FaChartLine, FaChevronLeft, FaChevronRight, FaTable } from 'react-icons/fa';
 import { Image } from '@chakra-ui/react';
 import axios from 'axios';
 import ChatInterface from '../components/ChatInterface';
@@ -51,9 +58,11 @@ interface TextbookTOC {
 
 interface GraphData {
   type: string;
-  image: string;
+  image?: string;
   title: string;
   description: string;
+  columns?: string[];
+  rows?: string[][];
 }
 
 interface UnitContent {
@@ -62,7 +71,25 @@ interface UnitContent {
     title: string;
     chapters: Record<string, string[]>;
     graphs?: Record<string, GraphData | Record<string | number, GraphData>>;
+    quiz?: Record<string, QuizQuestion[]>;
   }>;
+}
+
+interface QuizQuestion {
+  type: 'text' | 'table' | 'graph';
+  question: string;
+  options: string[];
+  correct: number;
+  explanation: string;
+  table?: {
+    title: string;
+    columns: string[];
+    rows: string[][];
+  };
+  graph?: {
+    spec: any;
+    image?: string;
+  };
 }
 
 interface TextbookPageProps {
@@ -75,6 +102,9 @@ const TextbookPage: React.FC<TextbookPageProps> = ({ subject }) => {
   const toast = useToast();
   const bgColor = useColorModeValue('white', 'gray.800');
   const solutionsBgColor = useColorModeValue('blue.50', 'blue.900');
+  const quizBgColor = useColorModeValue('purple.50', 'purple.900');
+  const correctBgColor = useColorModeValue('green.100', 'green.800');
+  const incorrectBgColor = useColorModeValue('red.100', 'red.800');
 
   // Get subject configuration
   const subjectConfig = getSubjectConfig(subject);
@@ -87,6 +117,15 @@ const TextbookPage: React.FC<TextbookPageProps> = ({ subject }) => {
   const [solutionVisibility, setSolutionVisibility] = useState<{[key: string]: boolean}>({});
   const [reviewQuestions, setReviewQuestions] = useState<{question: string, solution: string, id?: string}[]>([]);
 
+  // Quiz state
+  const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
+  const [quizAnswers, setQuizAnswers] = useState<{[key: number]: number}>({});
+  const [quizSubmitted, setQuizSubmitted] = useState<{[key: number]: boolean}>({});
+
+  // Cache: TOC per subject, chapter data per chapter key
+  const tocCache = useRef<Record<string, TextbookTOC>>({});
+  const chapterCache = useRef<Record<string, UnitContent>>({});
+
   // Determine what content to load based on URL params
   useEffect(() => {
     const fetchData = async () => {
@@ -95,23 +134,50 @@ const TextbookPage: React.FC<TextbookPageProps> = ({ subject }) => {
       setReviewQuestions([]);
 
       try {
-        // First always get the table of contents
-        const tocResponse = await axios.get(`http://localhost:8080/api/textbook/${subject}/toc`);
-        setTableOfContents(tocResponse.data);
+        // Get TOC (cached per subject)
+        let tocData: TextbookTOC;
+        if (tocCache.current[subject]) {
+          tocData = tocCache.current[subject];
+        } else {
+          const tocResponse = await axios.get(`http://localhost:8080/api/textbook/${subject}/toc`);
+          tocData = tocResponse.data;
+          tocCache.current[subject] = tocData;
+        }
+        setTableOfContents(tocData);
 
-        // If we have a unitId, fetch that unit's content
+        // If we have a unitId, fetch content
         if (unitId) {
-          const unitResponse = await axios.get(`http://localhost:8080/api/textbook/${subject}/unit/${unitId}`);
-          setUnitContent(unitResponse.data);
+          let responseData: UnitContent;
+
+          if (chapterId) {
+            // Fetch only the specific chapter (much smaller payload)
+            const cacheKey = `${subject}/${unitId}/${chapterId}`;
+            if (chapterCache.current[cacheKey]) {
+              responseData = chapterCache.current[cacheKey];
+            } else {
+              const chapterResponse = await axios.get(
+                `http://localhost:8080/api/textbook/${subject}/unit/${unitId}/chapter/${encodeURIComponent(chapterId)}`
+              );
+              responseData = chapterResponse.data;
+              chapterCache.current[cacheKey] = responseData;
+            }
+          } else {
+            // Fetch whole unit (unit overview, no specific chapter)
+            const unitResponse = await axios.get(`http://localhost:8080/api/textbook/${subject}/unit/${unitId}`);
+            responseData = unitResponse.data;
+          }
+
+          setUnitContent(responseData);
 
           // If we also have a chapterId, find that chapter's content
-          if (chapterId && unitResponse.data.units[unitId] && unitResponse.data.units[unitId].chapters) {
-            // Find the chapter content
-            const chapterTitle = Object.keys(unitResponse.data.units[unitId].chapters)
-              .find(title => title.toLowerCase().includes(chapterId.toLowerCase()));
-            
+          if (chapterId && responseData.units[unitId] && responseData.units[unitId].chapters) {
+            // Find the chapter content (exact match, case-insensitive)
+            const decodedChapterId = decodeURIComponent(chapterId).toLowerCase();
+            const chapterTitle = Object.keys(responseData.units[unitId].chapters)
+              .find(title => title.toLowerCase() === decodedChapterId);
+
             if (chapterTitle) {
-              const content = unitResponse.data.units[unitId].chapters[chapterTitle];
+              const content = responseData.units[unitId].chapters[chapterTitle];
               setChapterContent(content);
               
               // Process review questions and solutions
@@ -189,10 +255,28 @@ const TextbookPage: React.FC<TextbookPageProps> = ({ subject }) => {
                     id: `question-${questionsAndSolutions.length}`
                   });
                 });
-                
-                console.log('Processed review questions:', questionsAndSolutions);
+
                 setReviewQuestions(questionsAndSolutions);
               }
+
+              // Get quiz questions from chapter data
+              const chapterNum = tocData?.units?.[parseInt(unitId)]?.chapters?.find(
+                (ch: Chapter) => ch.title.toLowerCase() === decodedChapterId
+              )?.chapter_number;
+
+              if (chapterNum) {
+                const quizData = responseData.units[unitId]?.quiz?.[chapterNum];
+                if (quizData) {
+                  setQuizQuestions(quizData);
+                } else {
+                  setQuizQuestions([]);
+                }
+              } else {
+                setQuizQuestions([]);
+              }
+              // Reset quiz state when changing chapters
+              setQuizAnswers({});
+              setQuizSubmitted({});
             } else {
               toast({
                 title: 'Chapter not found',
@@ -213,7 +297,7 @@ const TextbookPage: React.FC<TextbookPageProps> = ({ subject }) => {
     };
 
     fetchData();
-  }, [subject, unitId, chapterId, toast]);
+  }, [subject, unitId, chapterId, toast, tableOfContents]);
 
   // Helper function to get a clean unit number for display
   const getUnitNumber = (id: string): number => {
@@ -248,9 +332,10 @@ const TextbookPage: React.FC<TextbookPageProps> = ({ subject }) => {
   const getCurrentChapterIndex = () => {
     if (!chapterId) return -1;
     const allChapters = getAllChaptersInOrder();
-    return allChapters.findIndex(chapter => 
-      chapter.chapterTitle.toLowerCase().includes(chapterId.toLowerCase()) ||
-      chapterId.toLowerCase().includes(chapter.chapterTitle.toLowerCase())
+    const decodedChapterId = decodeURIComponent(chapterId).toLowerCase();
+    // Use exact match to avoid substring collisions (e.g., "Demand" matching "Demand and Supply for Factors")
+    return allChapters.findIndex(chapter =>
+      chapter.chapterTitle.toLowerCase() === decodedChapterId
     );
   };
 
@@ -258,7 +343,16 @@ const TextbookPage: React.FC<TextbookPageProps> = ({ subject }) => {
   const getPreviousChapter = () => {
     const allChapters = getAllChaptersInOrder();
     const currentIndex = getCurrentChapterIndex();
-    
+
+    // If on unit page (no chapter), go to last chapter of previous unit
+    if (currentIndex === -1 && unitId) {
+      const prevUnitChapters = allChapters.filter(ch => parseInt(ch.unitId) < parseInt(unitId));
+      if (prevUnitChapters.length > 0) {
+        return prevUnitChapters[prevUnitChapters.length - 1];
+      }
+      return null;
+    }
+
     if (currentIndex <= 0) return null;
     return allChapters[currentIndex - 1];
   };
@@ -267,7 +361,16 @@ const TextbookPage: React.FC<TextbookPageProps> = ({ subject }) => {
   const getNextChapter = () => {
     const allChapters = getAllChaptersInOrder();
     const currentIndex = getCurrentChapterIndex();
-    
+
+    // If on unit page (no chapter), go to first chapter of current unit
+    if (currentIndex === -1 && unitId) {
+      const currentUnitChapters = allChapters.filter(ch => ch.unitId === unitId);
+      if (currentUnitChapters.length > 0) {
+        return currentUnitChapters[0];
+      }
+      return null;
+    }
+
     if (currentIndex === -1 || currentIndex >= allChapters.length - 1) return null;
     return allChapters[currentIndex + 1];
   };
@@ -286,6 +389,26 @@ const TextbookPage: React.FC<TextbookPageProps> = ({ subject }) => {
       navigate(`/textbook/${subject}/unit/${nextChapter.unitId}/chapter/${encodeURIComponent(nextChapter.chapterTitle)}`);
     }
   };
+
+  // Keyboard navigation with arrow keys
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Only handle arrow keys when not in an input field
+      if (event.target instanceof HTMLInputElement ||
+          event.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      if (event.key === 'ArrowLeft') {
+        navigateToPreviousChapter();
+      } else if (event.key === 'ArrowRight') {
+        navigateToNextChapter();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [unitContent, chapterId]); // Re-attach when content or chapter changes
 
   // Render breadcrumbs navigation
   const renderBreadcrumbs = () => {
@@ -393,14 +516,16 @@ This textbook covers all the essential concepts and topics for the {subjectConfi
     );
   };
 
-  // Render graph component
+  // Render graph or table component
   const renderGraph = (graphData: GraphData) => {
+    const isTable = graphData.type === 'table' && graphData.columns && graphData.rows;
+
     return (
       <Box mt={6} mb={6} p={4} bg="gray.50" borderRadius="md" borderWidth="1px">
         <HStack mb={3} spacing={2}>
-          <IconWrapper icon={FaChartLine} size={20} />
+          <IconWrapper icon={isTable ? FaTable : FaChartLine} size={20} />
           <Heading as="h5" size="sm">
-            {graphData.title || 'Economic Graph'}
+            {graphData.title || 'Visualization'}
           </Heading>
         </HStack>
         {graphData.description && (
@@ -408,189 +533,94 @@ This textbook covers all the essential concepts and topics for the {subjectConfi
             {graphData.description}
           </Text>
         )}
-        <Image 
-          src={`data:image/png;base64,${graphData.image}`}
-          alt={graphData.title || 'Economic Graph'}
-          maxW={{ base: "100%", md: "600px" }}
-          height="auto"
-          borderRadius="md"
-          boxShadow="sm"
-          mx="auto"
-          display="block"
-        />
+        {isTable ? (
+          <TableContainer>
+            <Table variant="striped" colorScheme="blue" size="md">
+              <Thead>
+                <Tr>
+                  {graphData.columns!.map((col, i) => (
+                    <Th key={i} bg="blue.500" color="white" fontSize="sm" textTransform="none">
+                      {col}
+                    </Th>
+                  ))}
+                </Tr>
+              </Thead>
+              <Tbody>
+                {graphData.rows!.map((row, i) => (
+                  <Tr key={i}>
+                    {row.map((cell, j) => (
+                      <Td key={j} fontSize="sm">{cell}</Td>
+                    ))}
+                  </Tr>
+                ))}
+              </Tbody>
+            </Table>
+          </TableContainer>
+        ) : graphData.image ? (
+          <Image
+            src={`data:image/png;base64,${graphData.image}`}
+            alt={graphData.title || 'Graph'}
+            maxW={{ base: "100%", md: "600px" }}
+            height="auto"
+            borderRadius="md"
+            boxShadow="sm"
+            mx="auto"
+            display="block"
+          />
+        ) : null}
       </Box>
     );
   };
   
-  // Render all graphs for the chapter
-  const renderAllChapterGraphs = () => {
-    if (!unitContent || !unitId || !chapterId) return null;
-    
+  // Build a map of paragraph index → graph/table data for inline rendering
+  const graphsByIndex = useMemo((): Record<number, GraphData> => {
+    if (!unitContent || !unitId || !chapterId) return {};
+
     const unit = unitContent.units[unitId];
-    if (!unit || !unit.graphs) return null;
-    
-    // Find the chapter key that matches our current chapter
-    const chapterKeys = Object.keys(unit.chapters);
-    const matchingChapterKey = chapterKeys.find(title => 
-      title.toLowerCase().includes(chapterId.toLowerCase())
-    );
-    
-    if (!matchingChapterKey) return null;
-    
-    // Try to find the chapter number
-    let chapterNumber = null;
-    const chapterNumMatch = matchingChapterKey.match(/^(\d+\.\d+)/);
-    if (chapterNumMatch) {
-      chapterNumber = chapterNumMatch[1];
-    } else if (chapterId) {
-      const chapterIdMatch = chapterId.match(/(\d+\.\d+)/);
-      if (chapterIdMatch) {
-        chapterNumber = chapterIdMatch[1];
+    if (!unit || !unit.graphs) return {};
+
+    // Find the chapter number by matching chapterId (title) against the TOC
+    let chapterNumber: string | null = null;
+
+    // Method 1: Use TOC to map title → chapter_number
+    if (tableOfContents?.units?.[unitId]?.chapters) {
+      const tocChapter = tableOfContents.units[unitId].chapters.find(
+        (ch: Chapter) => ch.title.toLowerCase() === chapterId.toLowerCase()
+      );
+      if (tocChapter) {
+        chapterNumber = tocChapter.chapter_number;
       }
     }
-    
-    // If no chapter number found, use first available
-    if (!chapterNumber && unit.graphs) {
-      const availableKeys = Object.keys(unit.graphs);
-      if (availableKeys.length > 0) {
-        chapterNumber = availableKeys[0];
+
+    // Method 2: Try extracting number from chapterId directly (e.g. "1.2: Title")
+    if (!chapterNumber) {
+      const numMatch = chapterId.match(/(\d+\.\d+)/);
+      if (numMatch) {
+        chapterNumber = numMatch[1];
       }
     }
-    
-    if (!chapterNumber || !unit.graphs[chapterNumber]) return null;
-    
+
+    if (!chapterNumber || !unit.graphs[chapterNumber]) return {};
+
     const chapterGraphs = unit.graphs[chapterNumber];
-    
-    // Check if this is the new multi-graph format (has 'main' or numeric keys)
+    const result: Record<number, GraphData> = {};
+
     if (typeof chapterGraphs === 'object' && !(chapterGraphs as GraphData).type) {
-      // New format: graphs stored by paragraph index or 'main'
+      // Multi-graph format: keys are paragraph indices
       const graphsMap = chapterGraphs as Record<string | number, GraphData>;
-      const graphElements: React.ReactElement[] = [];
-      
-      // Add all graphs from the map
       Object.entries(graphsMap).forEach(([key, graph]) => {
-        graphElements.push(
-          <Box key={key}>
-            {renderGraph(graph)}
-          </Box>
-        );
+        const idx = parseInt(key, 10);
+        if (!isNaN(idx)) {
+          result[idx] = graph;
+        }
       });
-      
-      return <>{graphElements}</>;
     } else {
-      // Old format: single graph object
-      const graphData = chapterGraphs as GraphData;
-      return renderGraph(graphData);
+      // Old format: single graph — render after paragraph 0
+      result[0] = chapterGraphs as GraphData;
     }
-  };
-  
-  // Get graph for a specific paragraph index
-  const getGraphForParagraph = (paragraphIndex: number) => {
-    if (!unitContent || !unitId || !chapterId) return null;
-    
-    const unit = unitContent.units[unitId];
-    if (!unit || !unit.graphs) {
-      console.log('No graphs in unit');
-      return null;
-    }
-    
-    // Find the chapter key that matches our current chapter
-    const chapterKeys = Object.keys(unit.chapters);
-    const matchingChapterKey = chapterKeys.find(title => 
-      title.toLowerCase().includes(chapterId.toLowerCase())
-    );
-    
-    if (!matchingChapterKey) return null;
-    
-    // Try to find the chapter number
-    let chapterNumber = null;
-    const chapterNumMatch = matchingChapterKey.match(/^(\d+\.\d+)/);
-    if (chapterNumMatch) {
-      chapterNumber = chapterNumMatch[1];
-    } else if (chapterId) {
-      const chapterIdMatch = chapterId.match(/(\d+\.\d+)/);
-      if (chapterIdMatch) {
-        chapterNumber = chapterIdMatch[1];
-      }
-    }
-    
-    // If no chapter number found, use first available
-    if (!chapterNumber && unit.graphs) {
-      const availableKeys = Object.keys(unit.graphs);
-      if (availableKeys.length > 0) {
-        chapterNumber = availableKeys[0];
-      }
-    }
-    
-    if (!chapterNumber || !unit.graphs[chapterNumber]) {
-      console.log('No graph for chapter number:', chapterNumber, 'Available:', Object.keys(unit.graphs));
-      return null;
-    }
-    
-    const chapterGraphs = unit.graphs[chapterNumber];
-    console.log('Chapter graphs:', chapterGraphs);
-    
-    // Check if this is the new multi-graph format (has 'main' or numeric keys)
-    if (typeof chapterGraphs === 'object' && !(chapterGraphs as GraphData).type) {
-      // New format: graphs stored by paragraph index or 'main'
-      const graphsMap = chapterGraphs as Record<string | number, GraphData>;
-      
-      // First check for paragraph-specific graph
-      if (graphsMap[paragraphIndex]) {
-        console.log('Found graph for paragraph index:', paragraphIndex);
-        return graphsMap[paragraphIndex];
-      }
-      
-      // If there's a 'main' graph, find the first paragraph with graph keywords
-      if (graphsMap['main'] && chapterContent) {
-        // Find the first paragraph that mentions graph-related keywords
-        let firstGraphParagraph = -1;
-        for (let i = 0; i < chapterContent.length; i++) {
-          const para = chapterContent[i].toLowerCase();
-          if (para.includes('graph') || 
-              para.includes('curve') ||
-              para.includes('visualized') ||
-              para.includes('illustrated') ||
-              para.includes('diagram') ||
-              para.includes('chart') ||
-              para.includes('model') ||
-              para.includes('ppf') ||
-              para.includes('trade-off')) {
-            firstGraphParagraph = i;
-            break;
-          }
-        }
-        
-        // Only show the graph at the first paragraph that mentions it
-        if (firstGraphParagraph === paragraphIndex) {
-          console.log('Showing main graph at paragraph', paragraphIndex);
-          return graphsMap['main'];
-        }
-      }
-      
-      return null;
-    } else {
-      // Old format: single graph object
-      const graphData = chapterGraphs as GraphData;
-      // For backwards compatibility with old format, look for generic graph/visualization keywords
-      if (chapterContent && chapterContent[paragraphIndex]) {
-        const paragraph = chapterContent[paragraphIndex].toLowerCase();
-        // Look for generic visualization/graph mentions
-        if (paragraph.includes('graph') || 
-            paragraph.includes('curve') ||
-            paragraph.includes('visualized') ||
-            paragraph.includes('illustrated') ||
-            paragraph.includes('diagram') ||
-            paragraph.includes('chart') ||
-            paragraph.includes('model')) {
-          console.log('Found graph keyword in paragraph', paragraphIndex);
-          return graphData;
-        }
-      }
-    }
-    
-    return null;
-  };
+
+    return result;
+  }, [unitContent, unitId, chapterId, tableOfContents]);
 
   // Render a specific unit's content
   const renderUnitContent = () => {
@@ -645,17 +675,18 @@ This textbook covers all the essential concepts and topics for the {subjectConfi
         {chapterId && chapterContent && (
           <VStack spacing={6} align="stretch">
             <Heading as="h3" size="lg">{chapterId}</Heading>
-            <Box 
-              p={6} 
-              shadow="md" 
-              borderWidth="1px" 
+            <Box
+              p={6}
+              shadow="md"
+              borderWidth="1px"
               borderRadius="md"
               bg={bgColor}
             >
               {/* Regular content */}
-              {chapterContent.map((paragraph, idx) => {
+              {(() => {
+                return chapterContent.map((paragraph, idx) => {
                 // Get the index of the Review Questions section
-                const reviewSectionIdx = chapterContent.findIndex(p => 
+                const reviewSectionIdx = chapterContent.findIndex(p =>
                   p.trim().startsWith('## Review Questions') || p.trim().startsWith('## Practice Problems')
                 );
                 
@@ -670,69 +701,77 @@ This textbook covers all the essential concepts and topics for the {subjectConfi
                   // Special styling for Introduction heading
                   if (headingText === 'Introduction') {
                     return (
-                      <Heading as="h4" size="md" mt={idx > 0 ? 8 : 0} mb={4} key={idx} color="blue.600">
-                        {headingText}
-                      </Heading>
+                      <React.Fragment key={idx}>
+                        <Heading as="h4" size="md" mt={idx > 0 ? 8 : 0} mb={4} color="blue.600">
+                          {headingText}
+                        </Heading>
+                        {graphsByIndex[idx] && renderGraph(graphsByIndex[idx])}
+                      </React.Fragment>
                     );
                   }
-                  
+
                   // Special styling for Conclusion heading
                   if (headingText === 'Conclusion') {
                     return (
-                      <Heading as="h4" size="md" mt={idx > 0 ? 8 : 0} mb={4} key={idx} color="green.600">
-                        {headingText}
-                      </Heading>
-                    );
-                  }
-                  
-                  // Economic Analysis and Models - display all graphs after this section
-                  if (headingText === 'Economic Analysis and Models') {
-                    return (
                       <React.Fragment key={idx}>
-                        <Heading as="h4" size="md" mt={idx > 0 ? 8 : 0} mb={4}>
+                        <Heading as="h4" size="md" mt={idx > 0 ? 8 : 0} mb={4} color="green.600">
                           {headingText}
                         </Heading>
-                        {renderAllChapterGraphs()}
+                        {graphsByIndex[idx] && renderGraph(graphsByIndex[idx])}
                       </React.Fragment>
                     );
                   }
                   
-                  // Still convert graph sections to regular headings
-                  if (headingText.startsWith('Graph: ')) {
-                    return (
-                      <Heading as="h4" size="md" mt={idx > 0 ? 8 : 0} mb={4} key={idx}>
+                  // Regular heading (including Graph: prefixed)
+                  return (
+                    <React.Fragment key={idx}>
+                      <Heading as="h4" size="md" mt={idx > 0 ? 8 : 0} mb={4}>
                         {headingText}
                       </Heading>
-                    );
-                  }
-                  
-                  // Regular heading
+                      {graphsByIndex[idx] && renderGraph(graphsByIndex[idx])}
+                    </React.Fragment>
+                  );
+                }
+                // Check for ### subheadings
+                else if (paragraph.trim().startsWith('### ')) {
+                  const subheadingText = paragraph.trim().substring(4);
                   return (
-                    <Heading as="h4" size="md" mt={idx > 0 ? 8 : 0} mb={4} key={idx}>
-                      {headingText}
-                    </Heading>
+                    <React.Fragment key={idx}>
+                      <Heading as="h5" size="sm" mt={6} mb={3} color="gray.700">
+                        {subheadingText}
+                      </Heading>
+                      {graphsByIndex[idx] && renderGraph(graphsByIndex[idx])}
+                    </React.Fragment>
                   );
                 }
                 // Check if paragraph is a horizontal rule
                 else if (paragraph.trim() === '---') {
-                  return <Divider key={idx} my={4} />;
+                  return (
+                    <React.Fragment key={idx}>
+                      <Divider my={4} />
+                      {graphsByIndex[idx] && renderGraph(graphsByIndex[idx])}
+                    </React.Fragment>
+                  );
                 }
                 // Check if paragraph is a bullet point list
                 else if (paragraph.trim().match(/^\* /m)) {
                   const listItems = paragraph.split(/^\* /m).filter(item => item.trim());
                   return (
-                    <UnorderedList key={idx} mb={4} pl={4} spacing={2}>
-                      {listItems.map((item, itemIdx) => (
-                        <ListItem key={itemIdx}>
-                          {item.split(/(\*\*[^*]+\*\*)/g).map((part, partIdx) => {
-                            if (part.startsWith('**') && part.endsWith('**')) {
-                              return <Text as="span" fontWeight="bold" color="blue.700" key={partIdx}>{part.slice(2, -2)}</Text>;
-                            }
-                            return part;
-                          })}
-                        </ListItem>
-                      ))}
-                    </UnorderedList>
+                    <React.Fragment key={idx}>
+                      <UnorderedList mb={4} pl={4} spacing={2}>
+                        {listItems.map((item, itemIdx) => (
+                          <ListItem key={itemIdx}>
+                            {item.split(/(\*\*[^*]+\*\*)/g).map((part, partIdx) => {
+                              if (part.startsWith('**') && part.endsWith('**')) {
+                                return <Text as="span" fontWeight="bold" color="blue.700" key={partIdx}>{part.slice(2, -2)}</Text>;
+                              }
+                              return part;
+                            })}
+                          </ListItem>
+                        ))}
+                      </UnorderedList>
+                      {graphsByIndex[idx] && renderGraph(graphsByIndex[idx])}
+                    </React.Fragment>
                   );
                 }
                 // Check if it's a solution paragraph for in-text examples
@@ -809,6 +848,7 @@ This textbook covers all the essential concepts and topics for the {subjectConfi
                             return part;
                           })}
                         </Text>
+                        {graphsByIndex[idx] && renderGraph(graphsByIndex[idx])}
                       </React.Fragment>
                     );
                   } else if (isConclusionParagraph) {
@@ -822,6 +862,7 @@ This textbook covers all the essential concepts and topics for the {subjectConfi
                             return part;
                           })}
                         </Text>
+                        {graphsByIndex[idx] && renderGraph(graphsByIndex[idx])}
                       </React.Fragment>
                     );
                   }
@@ -837,11 +878,14 @@ This textbook covers all the essential concepts and topics for the {subjectConfi
                           return part;
                         })}
                       </Text>
+                      {graphsByIndex[idx] && renderGraph(graphsByIndex[idx])}
                     </React.Fragment>
                   );
                 }
-              })}
+              });
+              })()}
               {renderReviewQuestions()}
+              {renderPracticeQuiz()}
             </Box>
           </VStack>
         )}
@@ -895,6 +939,161 @@ This textbook covers all the essential concepts and topics for the {subjectConfi
     );
   };
 
+  // Render practice quiz section
+  const renderPracticeQuiz = () => {
+    return (
+      <Box mt={8} p={6} bg={quizBgColor} borderRadius="md">
+        <Heading as="h4" size="md" mb={6}>Practice Quiz</Heading>
+
+        {quizQuestions.length === 0 ? (
+          <Text color="gray.600">
+            No practice quiz available for this chapter yet. Regenerate the chapter to create one.
+          </Text>
+        ) : (
+          <VStack spacing={6} align="stretch">
+            {quizQuestions.map((q, idx) => (
+              <Box
+                key={idx}
+                p={4}
+                bg="white"
+                borderRadius="md"
+                borderWidth="1px"
+                borderColor={
+                  quizSubmitted[idx]
+                    ? quizAnswers[idx] === q.correct
+                      ? 'green.400'
+                      : 'red.400'
+                    : 'gray.200'
+                }
+              >
+                <Text fontWeight="bold" mb={3}>Question {idx + 1}</Text>
+
+                {/* Render table if present */}
+                {q.type === 'table' && q.table && (
+                  <Box mb={4} overflowX="auto">
+                    <Text fontWeight="medium" mb={2}>{q.table.title}</Text>
+                    <TableContainer>
+                      <Table size="sm" variant="simple">
+                        <Thead>
+                          <Tr>
+                            {q.table.columns.map((col, i) => (
+                              <Th key={i}>{col}</Th>
+                            ))}
+                          </Tr>
+                        </Thead>
+                        <Tbody>
+                          {q.table.rows.map((row, i) => (
+                            <Tr key={i}>
+                              {row.map((cell, j) => (
+                                <Td key={j}>{cell}</Td>
+                              ))}
+                            </Tr>
+                          ))}
+                        </Tbody>
+                      </Table>
+                    </TableContainer>
+                  </Box>
+                )}
+
+                {/* Render graph if present */}
+                {q.type === 'graph' && q.graph?.image && (
+                  <Box mb={4}>
+                    <Image
+                      src={`data:image/png;base64,${q.graph.image}`}
+                      alt="Question graph"
+                      maxW="400px"
+                      borderRadius="md"
+                    />
+                  </Box>
+                )}
+
+                <Text mb={4}>{q.question}</Text>
+
+                {/* Answer options */}
+                <VStack align="stretch" spacing={2} mb={4}>
+                  {q.options.map((option, optIdx) => (
+                    <Box
+                      key={optIdx}
+                      p={3}
+                      borderRadius="md"
+                      borderWidth="1px"
+                      cursor={quizSubmitted[idx] ? 'default' : 'pointer'}
+                      bg={
+                        quizSubmitted[idx]
+                          ? optIdx === q.correct
+                            ? correctBgColor
+                            : quizAnswers[idx] === optIdx
+                              ? incorrectBgColor
+                              : 'white'
+                          : quizAnswers[idx] === optIdx
+                            ? 'blue.100'
+                            : 'white'
+                      }
+                      borderColor={
+                        quizAnswers[idx] === optIdx ? 'blue.400' : 'gray.200'
+                      }
+                      onClick={() => {
+                        if (!quizSubmitted[idx]) {
+                          setQuizAnswers(prev => ({ ...prev, [idx]: optIdx }));
+                        }
+                      }}
+                      _hover={!quizSubmitted[idx] ? { bg: 'blue.50' } : {}}
+                    >
+                      <HStack>
+                        <Text fontWeight="bold" color="gray.600">
+                          {String.fromCharCode(65 + optIdx)}.
+                        </Text>
+                        <Text>{option}</Text>
+                      </HStack>
+                    </Box>
+                  ))}
+                </VStack>
+
+                {/* Check Answer button */}
+                {!quizSubmitted[idx] && (
+                  <Button
+                    colorScheme="blue"
+                    size="sm"
+                    isDisabled={quizAnswers[idx] === undefined}
+                    onClick={() => setQuizSubmitted(prev => ({ ...prev, [idx]: true }))}
+                  >
+                    Check Answer
+                  </Button>
+                )}
+
+                {/* Explanation after submission */}
+                {quizSubmitted[idx] && (
+                  <Box
+                    mt={4}
+                    p={4}
+                    bg={quizAnswers[idx] === q.correct ? 'green.50' : 'red.50'}
+                    borderRadius="md"
+                  >
+                    <Text fontWeight="bold" color={quizAnswers[idx] === q.correct ? 'green.600' : 'red.600'}>
+                      {quizAnswers[idx] === q.correct ? '✓ Correct!' : '✗ Incorrect'}
+                    </Text>
+                    <Text mt={2}>{q.explanation}</Text>
+                  </Box>
+                )}
+              </Box>
+            ))}
+
+            {/* Score summary */}
+            {Object.keys(quizSubmitted).length === quizQuestions.length && quizQuestions.length > 0 && (
+              <Box p={4} bg="blue.100" borderRadius="md" textAlign="center">
+                <Text fontSize="lg" fontWeight="bold">
+                  Score: {Object.entries(quizSubmitted).filter(([idx]) =>
+                    quizAnswers[parseInt(idx)] === quizQuestions[parseInt(idx)].correct
+                  ).length} / {quizQuestions.length}
+                </Text>
+              </Box>
+            )}
+          </VStack>
+        )}
+      </Box>
+    );
+  };
+
   return (
     <Box minH="100vh" bg="gray.50" position="relative">
       <Container maxW="6xl" py={6}>
@@ -928,8 +1127,8 @@ This textbook covers all the essential concepts and topics for the {subjectConfi
         )}
       </Container>
       
-      {/* Floating Navigation Arrows - only show when viewing a specific chapter */}
-      {chapterId && (
+      {/* Floating Navigation Arrows - show on unit and chapter pages */}
+      {unitId && (
         <>
           {/* Previous Chapter Arrow */}
           {getPreviousChapter() && (

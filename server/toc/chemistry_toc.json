@@ -1,0 +1,95 @@
+{
+  "type": "chemistry",
+  "units": {
+    "1": {
+      "title": "Atomic Structure and Properties",
+      "chapters": [
+        {
+          "chapter_number": "1.1",
+          "title": "Moles and Molar Mass",
+          "topics": [
+            "The mole concept: Avogadro's number (6.022 × 10²³)",
+            "Molar mass: Mass of one mole of a substance",
+            "Converting between moles, mass, and particles",
+            "Percent composition: Mass percentage of elements in compounds"
+          ]
+        },
+        {
+          "chapter_number": "1.2",
+          "title": "Mass Spectrometry of Elements",
+          "topics": [
+            "Mass spectrometer: How it separates isotopes",
+            "Isotopes: Atoms with different numbers of neutrons",
+            "Relative atomic mass: Weighted average of isotopes",
+            "Interpreting mass spectra: Peaks and abundances"
+          ]
+        },
+        {
+          "chapter_number": "1.3",
+          "title": "Elemental Composition of Pure Substances",
+          "topics": [
+            "Empirical formula: Simplest whole-number ratio of atoms",
+            "Molecular formula: Actual number of atoms in a molecule",
+            "Determining formulas from percent composition",
+            "Hydrates: Compounds containing water molecules"
+          ]
+        },
+        {
+          "chapter_number": "1.4",
+          "title": "Composition of Mixtures",
+          "topics": [
+            "Pure substances vs mixtures: Classification of matter",
+            "Homogeneous mixtures: Solutions and their properties",
+            "Heterogeneous mixtures: Distinguishing characteristics",
+            "Separation techniques: Filtration, distillation, chromatography"
+          ]
+        },
+        {
+          "chapter_number": "1.5",
+          "title": "Atomic Structure and Electron Configuration",
+          "topics": [
+            "Subatomic particles: Protons, neutrons, electrons",
+            "Electron configuration: Orbital notation and energy levels",
+            "Aufbau principle, Pauli exclusion, Hund's rule",
+            "Periodic trends: Relating configuration to position"
+          ]
+        }
+      ]
+    },
+    "2": {
+      "title": "Molecular and Ionic Compound Structure and Properties",
+      "chapters": [
+        {
+          "chapter_number": "2.1",
+          "title": "Types of Chemical Bonds",
+          "topics": [
+            "Ionic bonds: Transfer of electrons between atoms",
+            "Covalent bonds: Sharing of electrons between atoms",
+            "Metallic bonds: Sea of delocalized electrons",
+            "Electronegativity: Predicting bond type"
+          ]
+        },
+        {
+          "chapter_number": "2.2",
+          "title": "Intramolecular Force and Potential Energy",
+          "topics": [
+            "Bond energy: Energy required to break a bond",
+            "Bond length: Distance between bonded nuclei",
+            "Potential energy diagrams: Visualizing bond formation",
+            "Relationship between bond strength and stability"
+          ]
+        },
+        {
+          "chapter_number": "2.3",
+          "title": "Structure of Ionic Solids",
+          "topics": [
+            "Crystal lattice: 3D arrangement of ions",
+            "Lattice energy: Stability of ionic compounds",
+            "Properties of ionic compounds: Melting point, conductivity",
+            "Predicting ionic compound formulas"
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "type": "biology",
+  "units": {
+    "1": {
+      "title": "Chemistry of Life",
+      "chapters": [
+        {
+          "chapter_number": "1.1",
+          "title": "Structure of Water and Hydrogen Bonding",
+          "topics": [
+            "Water molecule structure: Polar covalent bonds and molecular geometry",
+            "Hydrogen bonding: Attraction between water molecules",
+            "Properties of water: Cohesion, adhesion, surface tension",
+            "Water as a solvent: Hydrophilic vs hydrophobic substances",
+            "Temperature moderation: High specific heat and heat of vaporization"
+          ]
+        },
+        {
+          "chapter_number": "1.2",
+          "title": "Elements of Life",
+          "topics": [
+            "Essential elements: Carbon, hydrogen, oxygen, nitrogen, phosphorus, sulfur",
+            "Trace elements: Iron, iodine, zinc and their biological roles",
+            "Carbon chemistry: Tetravalence and organic molecule diversity",
+            "Functional groups: Hydroxyl, carbonyl, carboxyl, amino, phosphate, sulfhydryl"
+          ]
+        },
+        {
+          "chapter_number": "1.3",
+          "title": "Introduction to Biological Macromolecules",
+          "topics": [
+            "Monomers and polymers: Building blocks of macromolecules",
+            "Dehydration synthesis: Formation of covalent bonds between monomers",
+            "Hydrolysis: Breaking polymers into monomers",
+            "Four classes of macromolecules: Carbohydrates, lipids, proteins, nucleic acids"
+          ]
+        },
+        {
+          "chapter_number": "1.4",
+          "title": "Properties, Structure, and Function of Biological Macromolecules",
+          "topics": [
+            "Carbohydrates: Monosaccharides, disaccharides, polysaccharides",
+            "Lipids: Fats, phospholipids, steroids",
+            "Proteins: Amino acids, peptide bonds, levels of structure",
+            "Nucleic acids: DNA and RNA structure, nucleotides"
+          ]
+        }
+      ]
+    },
+    "2": {
+      "title": "Cell Structure and Function",
+      "chapters": [
+        {
+          "chapter_number": "2.1",
+          "title": "Cell Structure: Subcellular Components",
+          "topics": [
+            "Cell theory: Basic principles of cellular biology",
+            "Prokaryotic vs eukaryotic cells: Key differences",
+            "Organelles: Nucleus, mitochondria, chloroplasts, ER, Golgi",
+            "Cytoskeleton: Microfilaments, intermediate filaments, microtubules"
+          ]
+        },
+        {
+          "chapter_number": "2.2",
+          "title": "Cell Structure and Function",
+          "topics": [
+            "Plasma membrane: Phospholipid bilayer structure",
+            "Membrane proteins: Integral and peripheral proteins",
+            "Fluid mosaic model: Membrane organization and fluidity",
+            "Cell compartmentalization: Organelle functions"
+          ]
+        },
+        {
+          "chapter_number": "2.3",
+          "title": "Cell Size",
+          "topics": [
+            "Surface area to volume ratio: Limits on cell size",
+            "Diffusion and cell efficiency: Why cells must remain small",
+            "Adaptations for increased surface area: Microvilli, folded membranes"
+          ]
+        }
+      ]
+    }
+  }
+}

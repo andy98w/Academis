@@ -143,7 +143,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               <IconWrapper icon={FaQuestion} size={14} />
             </Box>
             <Heading size="sm">
-              AP {subject === 'micro' ? 'Microeconomics' : 'Macroeconomics'} Chat
+              {subjectConfig.fullName} Chat
             </Heading>
           </Flex>
           <Flex>

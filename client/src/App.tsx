@@ -54,10 +54,6 @@ function App() {
             <Route path="/textbook/:subject/unit/:unitId" element={<TextbookPageWrapper />} />
             <Route path="/textbook/:subject/unit/:unitId/chapter/:chapterId" element={<TextbookPageWrapper />} />
             
-            {/* Legacy routes for backwards compatibility - redirect to new structure */}
-            <Route path="/micro" element={<SubjectPage subjectId="micro" />} />
-            <Route path="/macro" element={<SubjectPage subjectId="macro" />} />
-            
             {/* Catch-all for unknown routes */}
             <Route path="*" element={<div>Page not found</div>} />
           </Routes>

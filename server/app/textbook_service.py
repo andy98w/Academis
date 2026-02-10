@@ -8,8 +8,7 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 from .helpers import (
     load_toc_from_file,
-    get_chapter_content_with_preview,
-    get_chapter_graph_data,
+    get_chapter_data,
     validate_and_clean_content
 )
 
@@ -59,31 +58,37 @@ async def get_textbook_content(subject: str, unit: int = None, chapter: str = No
                         chapter_found = True
                         chapter_key = ch_data["chapter_number"]
                         chapter_title = ch_data["title"]
-                        
-                        chapter_content = get_chapter_content_with_preview(
+
+                        chapter_content, graph_data, quiz_data = get_chapter_data(
                             textbook_collection, subject, unit, chapter_key, chapter_title)
                         result["units"][unit]["chapters"][chapter_title] = chapter_content
-                        graph_data = get_chapter_graph_data(textbook_collection, subject, unit, chapter_key)
                         if graph_data:
                             if "graphs" not in result["units"][unit]:
                                 result["units"][unit]["graphs"] = {}
                             result["units"][unit]["graphs"][chapter_key] = graph_data
-                
+                        if quiz_data:
+                            if "quiz" not in result["units"][unit]:
+                                result["units"][unit]["quiz"] = {}
+                            result["units"][unit]["quiz"][chapter_key] = quiz_data
+
                 if not chapter_found:
                     raise ValueError(f"Chapter '{chapter}' not found in Unit {unit}")
             else:
                 for ch_data in unit_data["chapters"]:
                     chapter_key = ch_data["chapter_number"]
                     chapter_title = ch_data["title"]
-                    
-                    chapter_content = get_chapter_content_with_preview(
+
+                    chapter_content, graph_data, quiz_data = get_chapter_data(
                         textbook_collection, subject, unit, chapter_key, chapter_title)
                     result["units"][unit]["chapters"][chapter_title] = chapter_content
-                    graph_data = get_chapter_graph_data(textbook_collection, subject, unit, chapter_key)
                     if graph_data:
                         if "graphs" not in result["units"][unit]:
                             result["units"][unit]["graphs"] = {}
                         result["units"][unit]["graphs"][chapter_key] = graph_data
+                    if quiz_data:
+                        if "quiz" not in result["units"][unit]:
+                            result["units"][unit]["quiz"] = {}
+                        result["units"][unit]["quiz"][chapter_key] = quiz_data
         else:
             for unit_num, unit_data in toc["units"].items():
                 from .subject_config import SubjectConfig
@@ -113,41 +118,120 @@ async def generate_textbook_content(subject: str, unit: int, chapter: str) -> Li
     textbook_collection = db.textbook_content
     
     try:
-        chapter_key = chapter
-        # Check for and delete any existing content to ensure fresh generation
-        existing_content = textbook_collection.find_one({"chapter_id": chapter_key})
-        
-        if existing_content:
-            logger.info(f"Found existing content for {chapter_key}, deleting to generate fresh content")
-            textbook_collection.delete_one({"_id": existing_content["_id"]})
-        
-        logger.info(f"Generating fresh content for {chapter_key}")
-        
         # Get chapter information that both paths need
         toc = await get_textbook_toc(subject)
         subject_config = SubjectConfig.get_subject_config(subject)
         chapter_title = ""
+        chapter_key = chapter  # Will be updated to chapter_number if found
         for ch_data in toc["units"][unit]["chapters"]:
             if chapter == ch_data["chapter_number"] or chapter.lower() in ch_data["title"].lower():
                 chapter_title = ch_data["title"]
+                chapter_key = ch_data["chapter_number"]  # Use chapter number as key
                 break
-        
+
         if not chapter_title:
             raise ValueError(f"Chapter {chapter} not found in unit {unit}")
+
+        # Check for and delete any existing content to ensure fresh generation
+        existing_content = textbook_collection.find_one({"chapter_id": chapter_key, "subject": subject})
+
+        if existing_content:
+            logger.info(f"Found existing content for {chapter_key}, deleting to generate fresh content")
+            textbook_collection.delete_one({"_id": existing_content["_id"]})
+
+        logger.info(f"Generating fresh content for {chapter_key}")
         
         full_subject_name = subject_config["full_name"]
-        
-        # Use enhanced textbook generation agent (RAG-based generation deprecated)
+
+        # Check if agentic generator is enabled
+        use_agentic = os.getenv('USE_AGENTIC_GENERATOR', 'false').lower() == 'true'
+
+        if use_agentic:
+            # --- Agentic path: agent handles tools, graphs, and tables ---
+            logger.info(f"Using AGENTIC textbook generation for {chapter_title}")
+            from .agentic_textbook_generator import agentic_generator
+
+            paragraphs, generated_graphs = await agentic_generator.generate_chapter(
+                full_subject_name, chapter, chapter_title, subject
+            )
+
+            # Validate and clean content
+            paragraphs = validate_and_clean_content(paragraphs, subject, unit, chapter, toc)
+
+            new_doc = {
+                "chapter_id": chapter_key,
+                "subject": subject,
+                "unit": unit,
+                "chapter": chapter,
+                "chapter_title": chapter_title,
+                "content": paragraphs,
+                "generated_at": datetime.datetime.now(datetime.timezone.utc)
+            }
+
+            if generated_graphs:
+                cleaned_graphs = {}
+                for key, graph in generated_graphs.items():
+                    try:
+                        str_key = str(key)
+                        if isinstance(graph, dict) and 'type' in graph:
+                            cleaned = {
+                                'type': str(graph.get('type', 'unknown')),
+                                'title': str(graph.get('title', '')),
+                                'description': str(graph.get('description', ''))
+                            }
+                            # Graphs have base64 image data
+                            if graph.get('image'):
+                                cleaned['image'] = str(graph['image'])
+                            # Tables have structured column/row data
+                            if graph.get('columns'):
+                                cleaned['columns'] = graph['columns']
+                            if graph.get('rows'):
+                                cleaned['rows'] = graph['rows']
+                            cleaned_graphs[str_key] = cleaned
+                            logger.info(f"  - Asset at position {key}: {graph.get('title', 'unknown')} (type={cleaned['type']})")
+                    except Exception as graph_error:
+                        logger.warning(f"Skipping invalid asset at position {key}: {graph_error}")
+
+                if cleaned_graphs:
+                    new_doc["graphs"] = cleaned_graphs
+                    logger.info(f"Stored {len(cleaned_graphs)} assets with {chapter_key}")
+
+            # Generate quiz questions for this chapter
+            try:
+                from .quiz_generator import quiz_generator
+                topics_data = load_chapter_topics(subject)
+                topics = topics_data.get(chapter_key, [])
+
+                logger.info(f"Generating quiz for {chapter_key}")
+                quiz_questions = await quiz_generator.generate_quiz(
+                    subject=full_subject_name,
+                    chapter_content=paragraphs,
+                    topics=topics,
+                    num_questions=5
+                )
+
+                if quiz_questions:
+                    new_doc["quiz"] = quiz_questions
+                    logger.info(f"Generated {len(quiz_questions)} quiz questions for {chapter_key}")
+            except Exception as quiz_error:
+                logger.warning(f"Failed to generate quiz for {chapter_key}: {quiz_error}")
+
+            result = textbook_collection.insert_one(new_doc)
+            logger.info(f"Inserted agentic content for {chapter_key} with ID: {result.inserted_id}")
+            logger.info(f"Successfully generated {len(paragraphs)} paragraphs for {chapter_key}")
+            return paragraphs
+
+        # --- Legacy pipeline path (unchanged) ---
         from .textbook_agent import textbook_agent
-        
-        # Generate using the enhanced agent
+
         logger.info(f"Using enhanced textbook generation for {chapter_title}")
         use_web_search = os.getenv('TAVILY_API_KEY') is not None
-        
+
         response_text = await textbook_agent.generate_enhanced_textbook_content(
-            full_subject_name, 
+            full_subject_name,
             f"{chapter}: {chapter_title}",
-            use_web_search=use_web_search
+            use_web_search=use_web_search,
+            subject_code=subject  # Pass subject code for topic lookup
         )
         
         # Join paragraphs if they're already a list
@@ -191,21 +275,37 @@ async def generate_textbook_content(subject: str, unit: int, chapter: str) -> Li
                     'chapter_title': chapter_title
                 })
         
-        # Generate graphs for each detected [GRAPH] marker
+        # Generate graphs, but deduplicate by core concept to avoid near-identical visuals
         generated_graphs = {}
+        seen_concepts = set()
         for graph_info in graphs_to_generate:
             try:
-                # Pass full context including chapter title for better graph generation
                 full_context = f"Chapter: {chapter_title}\n\n{graph_info['context']}"
                 graph_data_item = await graph_response_handler.generate_contextual_graph(
-                    full_context, 
+                    full_context,
                     f"{chapter_title} - {graph_info['paragraph'][:100]}"
                 )
                 if graph_data_item:
-                    # Store the graph with the paragraph index as string key to ensure MongoDB compatibility
-                    graph_key = str(graph_info['index'])
-                    generated_graphs[graph_key] = graph_data_item
-                    logger.info(f"Generated {graph_data_item['type']} graph for paragraph {graph_info['index']}")
+                    # Extract a normalized concept key from the graph type/title
+                    graph_type = graph_data_item.get("type", "").lower()
+                    graph_title = graph_data_item.get("title", "").lower()
+                    combined = f"{graph_type} {graph_title}"
+
+                    # Extract core concept by removing common filler words
+                    import re
+                    concept_key = re.sub(r'\b(the|a|an|in|of|and|with|for|to|vs|versus)\b', '', combined)
+                    concept_key = re.sub(r'[^a-z]+', ' ', concept_key).strip()
+                    # Take first 3 significant words as the concept fingerprint
+                    words = [w for w in concept_key.split() if len(w) > 2][:3]
+                    concept_key = ' '.join(sorted(words))
+
+                    if concept_key not in seen_concepts:
+                        seen_concepts.add(concept_key)
+                        graph_key = str(graph_info['index'])
+                        generated_graphs[graph_key] = graph_data_item
+                        logger.info(f"Generated graph '{graph_data_item['type']}' (concept: {concept_key}) for paragraph {graph_info['index']}")
+                    else:
+                        logger.info(f"Skipping duplicate concept '{concept_key}' for paragraph {graph_info['index']}")
             except Exception as e:
                 logger.error(f"Error generating graph for paragraph {graph_info['index']}: {e}")
         

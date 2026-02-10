@@ -60,8 +60,8 @@ class GraphStorage:
         
         return None
     
-    async def store_graph(self, graph_type: str, parameters: Dict[str, Any], 
-                         image_base64: str, subject: str = "economics",
+    async def store_graph(self, graph_type: str, parameters: Dict[str, Any],
+                         image_base64: str, subject: str,
                          tags: List[str] = None, ttl_days: int = 30) -> str:
         """Store graph in MongoDB with metadata"""
         if self.collection is None:

@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from .textbook_service import get_textbook_content, get_textbook_toc, generate_textbook_content
-from .agent_service import economics_agent
+from .agent_service import get_agent
 from .subject_config import SubjectConfig
 from .graph_storage import graph_storage
 from typing import Optional
@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 load_dotenv(override=True)
 
-app = FastAPI(title="Academis AP Economics API")
+app = FastAPI(title="Academis Multi-Subject AP API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -38,6 +38,11 @@ class GenerateTextbookRequest(BaseModel):
     unit: int
     chapter: str
 
+class GenerateQuizRequest(BaseModel):
+    unit: int
+    chapter: str
+    num_questions: Optional[int] = 5
+
 class AnswerResponse(BaseModel):
     answer: str
     session_id: str
@@ -45,16 +50,18 @@ class AnswerResponse(BaseModel):
 async def _subject_endpoint(request: QuestionRequest, subject: str):
     if not SubjectConfig.is_valid_subject(subject):
         raise HTTPException(status_code=400, detail=f"Invalid subject: {subject}")
-    
+
     if not request.question:
         raise HTTPException(status_code=400, detail="Question is required")
-    
+
     try:
-        subject_config = SubjectConfig.get_subject_config(subject)
         base_session_id = request.session_id if request.session_id else "default"
         session_id = f"{base_session_id}_{subject}"
-        query = f"{subject_config['agent_prefix']} {request.question}"
-        answer = await economics_agent.get_response(query, session_id)
+
+        # Get the appropriate agent for this subject
+        agent = get_agent(subject)
+        answer = await agent.get_response(request.question, session_id)
+
         return AnswerResponse(answer=answer, session_id=session_id)
     except Exception as e:
         logger.error(f"Error processing {subject} question: {str(e)}")
@@ -223,3 +230,115 @@ async def get_available_subjects():
             for subject in subjects
         ]
     }
+
+# Quiz endpoints
+@app.post("/api/quiz/generate/{subject}", response_model=dict)
+async def generate_quiz(subject: str, request: GenerateQuizRequest):
+    """Generate a practice quiz for a chapter"""
+    if not SubjectConfig.is_valid_subject(subject):
+        raise HTTPException(status_code=400, detail=f"Invalid subject: {subject}")
+
+    try:
+        from .quiz_generator import quiz_generator
+        from .textbook_service import get_textbook_toc
+        from .helpers import get_chapter_data, load_chapter_topics
+        from .rag_service import db
+
+        if db is None:
+            raise HTTPException(status_code=500, detail="Database not available")
+
+        # Get TOC to find chapter info
+        toc = await get_textbook_toc(subject)
+        chapter_title = ""
+        chapter_key = request.chapter
+
+        for ch_data in toc["units"].get(request.unit, {}).get("chapters", []):
+            if request.chapter == ch_data["chapter_number"] or request.chapter.lower() in ch_data["title"].lower():
+                chapter_title = ch_data["title"]
+                chapter_key = ch_data["chapter_number"]
+                break
+
+        if not chapter_title:
+            raise HTTPException(status_code=404, detail=f"Chapter {request.chapter} not found")
+
+        # Get chapter content
+        textbook_collection = db.textbook_content
+        content, _ = get_chapter_data(textbook_collection, subject, request.unit, chapter_key, chapter_title)
+
+        # Get topics
+        topics_data = load_chapter_topics(subject)
+        topics = topics_data.get(chapter_key, [])
+
+        # Generate quiz
+        subject_name = SubjectConfig.get_full_subject_name(subject)
+        questions = await quiz_generator.generate_quiz(
+            subject=subject_name,
+            chapter_content=content,
+            topics=topics,
+            num_questions=request.num_questions
+        )
+
+        # Store quiz in database
+        quiz_collection = db.quiz_questions
+        quiz_doc = {
+            "subject": subject,
+            "unit": request.unit,
+            "chapter_id": chapter_key,
+            "chapter_title": chapter_title,
+            "questions": questions,
+            "generated_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+        }
+
+        # Update or insert
+        quiz_collection.update_one(
+            {"subject": subject, "chapter_id": chapter_key},
+            {"$set": quiz_doc},
+            upsert=True
+        )
+
+        logger.info(f"Generated {len(questions)} quiz questions for {subject} {chapter_key}")
+
+        return {
+            "message": f"Quiz generated for {chapter_title}",
+            "chapter_id": chapter_key,
+            "num_questions": len(questions),
+            "questions": questions
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating quiz: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/quiz/{subject}/{chapter_id}", response_model=dict)
+async def get_quiz(subject: str, chapter_id: str):
+    """Get quiz questions for a chapter"""
+    if not SubjectConfig.is_valid_subject(subject):
+        raise HTTPException(status_code=400, detail=f"Invalid subject: {subject}")
+
+    try:
+        from .rag_service import db
+
+        if db is None:
+            raise HTTPException(status_code=500, detail="Database not available")
+
+        quiz_collection = db.quiz_questions
+        quiz = quiz_collection.find_one(
+            {"subject": subject, "chapter_id": chapter_id},
+            {"_id": 0}
+        )
+
+        if not quiz:
+            return {"questions": [], "message": "No quiz available. Generate one first."}
+
+        return {
+            "chapter_id": quiz.get("chapter_id"),
+            "chapter_title": quiz.get("chapter_title"),
+            "questions": quiz.get("questions", []),
+            "generated_at": str(quiz.get("generated_at", ""))
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting quiz: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))

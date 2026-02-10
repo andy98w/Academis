@@ -16,9 +16,8 @@ if not MONGODB_URI:
     raise ValueError("MONGODB_URI environment variable is not set")
 client = MongoClient(MONGODB_URI, server_api=ServerApi("1"))
 db = client.Academis
-COLLECTION_NAME = "economics"
 
-async def upload_pdf(pdf_path):
+async def upload_pdf(pdf_path, collection_name):
     if not os.path.exists(pdf_path):
         print(f"PDF file not found: {pdf_path}")
         return
@@ -41,26 +40,28 @@ async def upload_pdf(pdf_path):
         splits = text_splitter.split_documents(pages)
         print(f"Created {len(splits)} chunks from the PDF")
 
-        collection = db[COLLECTION_NAME]
+        collection = db[collection_name]
         existing_count = collection.count_documents({})
+
+        index_name = f"{collection_name}_vector_index"
 
         if existing_count == 0:
             vector_store = MongoDBAtlasVectorSearch.from_documents(
                 documents=splits,
                 embedding=embeddings,
                 collection=collection,
-                index_name="economics_vector_index",
+                index_name=index_name,
             )
         else:
             vector_store = MongoDBAtlasVectorSearch(
-                collection_name=COLLECTION_NAME,
+                collection_name=collection_name,
                 embedding=embeddings,
                 collection=collection,
-                index_name="economics_vector_index",
+                index_name=index_name,
             )
             vector_store.add_documents(splits)
 
-        print(f"Successfully uploaded PDF to MongoDB Atlas ({len(splits)} chunks)")
+        print(f"Successfully uploaded PDF to MongoDB Atlas collection '{collection_name}' ({len(splits)} chunks)")
     except Exception as e:
         print(f"Error uploading PDF: {e}")
 
@@ -69,6 +70,8 @@ async def main():
         description="Upload a PDF to MongoDB Atlas Vector Search"
     )
     parser.add_argument("--pdf", help="Path to the PDF file")
+    parser.add_argument("--collection", required=True,
+                        help="MongoDB collection name (e.g. 'economics', 'biology', 'physics')")
 
     args = parser.parse_args()
     pdf_path = args.pdf
@@ -87,7 +90,7 @@ async def main():
         print("Error: No PDF file specified or found in data directory")
         return
 
-    await upload_pdf(pdf_path)
+    await upload_pdf(pdf_path, args.collection)
 
 if __name__ == "__main__":
     asyncio.run(main())

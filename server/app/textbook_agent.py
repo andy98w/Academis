@@ -20,7 +20,7 @@ class TextbookGenerationAgent:
         self.search_tool = self._initialize_search()
         self.rag_initialized = False
     
-    def _get_chapter_specific_topics(self, chapter: str, chapter_title: str, subject: str = "micro") -> str:
+    def _get_chapter_specific_topics(self, chapter: str, chapter_title: str, subject: str) -> str:
         from .helpers import get_chapter_specific_topics
         return get_chapter_specific_topics(chapter, chapter_title, subject)
         
@@ -139,11 +139,11 @@ STRICT REQUIREMENTS:
             logger.error(f"RAG retrieval error: {e}")
             return ""
     
-    async def generate_content_outline(self, subject: str, chapter_title: str, chapter_number: str = None) -> Dict[str, Any]:
+    async def generate_content_outline(self, subject: str, chapter_title: str, chapter_number: str = None, subject_code: str = None) -> Dict[str, Any]:
         """First pass: Generate a detailed outline for the chapter with chapter-specific focus"""
-        
+
         # Get chapter-specific topics to ensure focused content
-        chapter_specific_topics = self._get_chapter_specific_topics(chapter_number or "", chapter_title)
+        chapter_specific_topics = self._get_chapter_specific_topics(chapter_number or "", chapter_title, subject_code or subject)
         
         prompt = ChatPromptTemplate.from_template("""
         Create a focused outline for chapter "{chapter_title}" in {subject}.
@@ -261,14 +261,16 @@ STRICT REQUIREMENTS:
         
         INSTRUCTIONS:
         1. Base your content on the authoritative textbook content above
-        2. Enhance with current examples and information where appropriate  
+        2. Enhance with current examples and information where appropriate
         3. Cover ONLY the topics listed - do NOT introduce concepts from other chapters
         4. Write 2-4 focused paragraphs, each 3-5 sentences
         5. Use **bold** for key terms when first introduced
         6. Include specific examples that illustrate the listed topics
         7. Maintain academic rigor while being accessible
         8. Stay strictly within the chapter's boundaries
-        
+        9. DO NOT start with a title or heading - just write the content directly
+        10. DO NOT repeat the section title in bold at the start
+
         Content:
         """)
         
@@ -334,20 +336,25 @@ STRICT REQUIREMENTS:
         })
     
     async def generate_enhanced_textbook_content(self, subject: str, chapter_title: str,
-                                                 use_web_search: bool = True) -> List[str]:
+                                                 use_web_search: bool = True,
+                                                 subject_code: str = None) -> List[str]:
         """
         Generate high-quality textbook content using multiple passes and web enrichment
-        
+
         Args:
-            subject: The subject area (e.g., "AP Biology", "AP Chemistry", "AP History")
+            subject: The subject area display name (e.g., "AP Biology", "AP Chemistry")
             chapter_title: The chapter title (format: "1.1: Title" or just "Title")
             use_web_search: Whether to use web search for enrichment
-            
+            subject_code: The subject code (e.g., "micro", "biology") for topic lookup
+
         Returns:
             List of paragraphs with enhanced content
         """
-        
-        logger.info(f"Starting enhanced generation for {chapter_title}")
+
+        if not subject_code:
+            raise ValueError("subject_code is required for textbook generation")
+
+        logger.info(f"Starting enhanced generation for {chapter_title} (subject: {subject_code})")
         
         # Extract chapter number if present
         chapter_number = ""
@@ -355,11 +362,11 @@ STRICT REQUIREMENTS:
             chapter_number = chapter_title.split(":")[0].strip()
         
         # Step 1: Generate focused outline
-        outline = await self.generate_content_outline(subject, chapter_title, chapter_number)
+        outline = await self.generate_content_outline(subject, chapter_title, chapter_number, subject_code)
         logger.info(f"Generated outline with {len(outline.get('sections', []))} sections")
         
         # Step 1.5: Force visualization detection if topics contain visual terms
-        chapter_topics = self._get_chapter_specific_topics(chapter_number, chapter_title, "micro")
+        chapter_topics = self._get_chapter_specific_topics(chapter_number, chapter_title, subject_code)
         topics_text = chapter_topics.lower()
         visual_terms = ['curve', 'graph', 'chart', 'model', 'diagram', 'visual', 'showing']
         
@@ -375,8 +382,8 @@ STRICT REQUIREMENTS:
             if web_context:
                 logger.info(f"Found {len(web_context)} characters of web content")
         
-        # Step 2.5: Retrieve authoritative content from Princeton Review PDFs
-        chapter_topics = self._get_chapter_specific_topics(chapter_number, chapter_title, "micro")
+        # Step 2.5: Retrieve authoritative content from textbooks
+        chapter_topics = self._get_chapter_specific_topics(chapter_number, chapter_title, subject_code)
         logger.info("Retrieving authoritative content from textbooks...")
         authoritative_content = await self.retrieve_authoritative_content(chapter_title, chapter_topics)
         if authoritative_content:
@@ -403,37 +410,6 @@ STRICT REQUIREMENTS:
                     authoritative_content
                 )
                 all_paragraphs.extend(content.split("\n\n"))
-        
-        # Add visualization section if needed
-        if outline.get("visualizations_needed"):
-            # Use a more dynamic title based on chapter content
-            viz_section_title = "Visual Models and Analysis" if "model" in chapter_title.lower() else "Charts and Graphs"
-            all_paragraphs.append(f"## {viz_section_title}")
-            
-            # Generate description of models
-            model_prompt = ChatPromptTemplate.from_template("""
-            Describe the conceptual models and visual representations relevant to {chapter_title}.
-            
-            Visualizations/models to explain:
-            {visualizations}
-            
-            For each model:
-            - Explain what it represents
-            - Describe the axes and curves
-            - Explain how to interpret it
-            - Add [GRAPH:description] where the visualization should appear
-            
-            Write 3-4 detailed paragraphs.
-            """)
-            
-            visualizations = "\n".join(f"- {viz}" for viz in outline.get("visualizations_needed", []))
-            
-            chain = model_prompt | self.model | StrOutputParser()
-            model_content = await chain.ainvoke({
-                "chapter_title": chapter_title,
-                "visualizations": visualizations
-            })
-            all_paragraphs.extend(model_content.split("\n\n"))
         
         # Add practice problems with proper formatting for frontend
         all_paragraphs.append("## Review Questions")
