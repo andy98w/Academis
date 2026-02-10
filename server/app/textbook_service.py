@@ -199,14 +199,12 @@ async def generate_textbook_content(subject: str, unit: int, chapter: str) -> Li
             # Generate quiz questions for this chapter
             try:
                 from .quiz_generator import quiz_generator
-                topics_data = load_chapter_topics(subject)
-                topics = topics_data.get(chapter_key, [])
 
                 logger.info(f"Generating quiz for {chapter_key}")
                 quiz_questions = await quiz_generator.generate_quiz(
                     subject=full_subject_name,
                     chapter_content=paragraphs,
-                    topics=topics,
+                    chapter_title=chapter_title,
                     num_questions=5
                 )
 

@@ -241,7 +241,7 @@ async def generate_quiz(subject: str, request: GenerateQuizRequest):
     try:
         from .quiz_generator import quiz_generator
         from .textbook_service import get_textbook_toc
-        from .helpers import get_chapter_data, load_chapter_topics
+        from .helpers import get_chapter_data
         from .rag_service import db
 
         if db is None:
@@ -263,18 +263,14 @@ async def generate_quiz(subject: str, request: GenerateQuizRequest):
 
         # Get chapter content
         textbook_collection = db.textbook_content
-        content, _ = get_chapter_data(textbook_collection, subject, request.unit, chapter_key, chapter_title)
-
-        # Get topics
-        topics_data = load_chapter_topics(subject)
-        topics = topics_data.get(chapter_key, [])
+        content, _, _ = get_chapter_data(textbook_collection, subject, request.unit, chapter_key, chapter_title)
 
         # Generate quiz
         subject_name = SubjectConfig.get_full_subject_name(subject)
         questions = await quiz_generator.generate_quiz(
             subject=subject_name,
             chapter_content=content,
-            topics=topics,
+            chapter_title=chapter_title,
             num_questions=request.num_questions
         )
 

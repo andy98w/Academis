@@ -122,6 +122,79 @@ const TextbookPage: React.FC<TextbookPageProps> = ({ subject }) => {
   const [quizAnswers, setQuizAnswers] = useState<{[key: number]: number}>({});
   const [quizSubmitted, setQuizSubmitted] = useState<{[key: number]: boolean}>({});
 
+  // Generate storage key for quiz state
+  const getQuizStorageKey = () => `quiz_${subject}_${unitId}_${chapterId}`;
+
+  // Load quiz state from localStorage when chapter changes
+  useEffect(() => {
+    if (chapterId && unitId) {
+      const storageKey = getQuizStorageKey();
+      const savedState = localStorage.getItem(storageKey);
+      if (savedState) {
+        try {
+          const { answers, submitted } = JSON.parse(savedState);
+          setQuizAnswers(answers || {});
+          setQuizSubmitted(submitted || {});
+        } catch (e) {
+          console.error('Error loading quiz state:', e);
+        }
+      }
+    }
+  }, [subject, unitId, chapterId]);
+
+  // Save quiz state to localStorage when it changes
+  useEffect(() => {
+    if (chapterId && unitId && (Object.keys(quizAnswers).length > 0 || Object.keys(quizSubmitted).length > 0)) {
+      const storageKey = getQuizStorageKey();
+      localStorage.setItem(storageKey, JSON.stringify({
+        answers: quizAnswers,
+        submitted: quizSubmitted
+      }));
+    }
+  }, [quizAnswers, quizSubmitted, subject, unitId, chapterId]);
+
+  // Reset quiz progress
+  const resetQuiz = () => {
+    setQuizAnswers({});
+    setQuizSubmitted({});
+    const storageKey = getQuizStorageKey();
+    localStorage.removeItem(storageKey);
+  };
+
+  // Scroll position persistence
+  const getScrollStorageKey = () => `scroll_${subject}_${unitId}_${chapterId || 'overview'}`;
+
+  // Save scroll position before navigating away
+  useEffect(() => {
+    const saveScrollPosition = () => {
+      const storageKey = getScrollStorageKey();
+      localStorage.setItem(storageKey, String(window.scrollY));
+    };
+
+    // Save on scroll (debounced via the browser)
+    window.addEventListener('beforeunload', saveScrollPosition);
+
+    // Save when component unmounts (navigation)
+    return () => {
+      saveScrollPosition();
+      window.removeEventListener('beforeunload', saveScrollPosition);
+    };
+  }, [subject, unitId, chapterId]);
+
+  // Restore scroll position after content loads
+  useEffect(() => {
+    if (!loading) {
+      const storageKey = getScrollStorageKey();
+      const savedPosition = localStorage.getItem(storageKey);
+      if (savedPosition) {
+        // Small delay to ensure DOM is rendered
+        setTimeout(() => {
+          window.scrollTo(0, parseInt(savedPosition, 10));
+        }, 100);
+      }
+    }
+  }, [loading, subject, unitId, chapterId]);
+
   // Cache: TOC per subject, chapter data per chapter key
   const tocCache = useRef<Record<string, TextbookTOC>>({});
   const chapterCache = useRef<Record<string, UnitContent>>({});
@@ -274,9 +347,7 @@ const TextbookPage: React.FC<TextbookPageProps> = ({ subject }) => {
               } else {
                 setQuizQuestions([]);
               }
-              // Reset quiz state when changing chapters
-              setQuizAnswers({});
-              setQuizSubmitted({});
+              // Quiz state is loaded from localStorage via useEffect
             } else {
               toast({
                 title: 'Chapter not found',
@@ -344,15 +415,6 @@ const TextbookPage: React.FC<TextbookPageProps> = ({ subject }) => {
     const allChapters = getAllChaptersInOrder();
     const currentIndex = getCurrentChapterIndex();
 
-    // If on unit page (no chapter), go to last chapter of previous unit
-    if (currentIndex === -1 && unitId) {
-      const prevUnitChapters = allChapters.filter(ch => parseInt(ch.unitId) < parseInt(unitId));
-      if (prevUnitChapters.length > 0) {
-        return prevUnitChapters[prevUnitChapters.length - 1];
-      }
-      return null;
-    }
-
     if (currentIndex <= 0) return null;
     return allChapters[currentIndex - 1];
   };
@@ -362,32 +424,70 @@ const TextbookPage: React.FC<TextbookPageProps> = ({ subject }) => {
     const allChapters = getAllChaptersInOrder();
     const currentIndex = getCurrentChapterIndex();
 
-    // If on unit page (no chapter), go to first chapter of current unit
-    if (currentIndex === -1 && unitId) {
-      const currentUnitChapters = allChapters.filter(ch => ch.unitId === unitId);
-      if (currentUnitChapters.length > 0) {
-        return currentUnitChapters[0];
-      }
-      return null;
-    }
-
     if (currentIndex === -1 || currentIndex >= allChapters.length - 1) return null;
     return allChapters[currentIndex + 1];
   };
 
+  // Get all unit IDs in order
+  const getAllUnitsInOrder = () => {
+    if (!tableOfContents?.units) return [];
+    return Object.keys(tableOfContents.units)
+      .map(id => parseInt(id))
+      .sort((a, b) => a - b);
+  };
+
   // Navigation functions
-  const navigateToPreviousChapter = () => {
+  const navigateToPrevious = () => {
+    // If on unit page (no chapter), navigate between units
+    if (!chapterId && unitId) {
+      const allUnits = getAllUnitsInOrder();
+      const currentUnitIndex = allUnits.indexOf(parseInt(unitId));
+      if (currentUnitIndex > 0) {
+        navigate(`/textbook/${subject}/unit/${allUnits[currentUnitIndex - 1]}`);
+      }
+      return;
+    }
+
+    // Otherwise navigate between chapters
     const prevChapter = getPreviousChapter();
     if (prevChapter) {
       navigate(`/textbook/${subject}/unit/${prevChapter.unitId}/chapter/${encodeURIComponent(prevChapter.chapterTitle)}`);
     }
   };
 
-  const navigateToNextChapter = () => {
+  const navigateToNext = () => {
+    // If on unit page (no chapter), navigate between units
+    if (!chapterId && unitId) {
+      const allUnits = getAllUnitsInOrder();
+      const currentUnitIndex = allUnits.indexOf(parseInt(unitId));
+      if (currentUnitIndex < allUnits.length - 1) {
+        navigate(`/textbook/${subject}/unit/${allUnits[currentUnitIndex + 1]}`);
+      }
+      return;
+    }
+
+    // Otherwise navigate between chapters
     const nextChapter = getNextChapter();
     if (nextChapter) {
       navigate(`/textbook/${subject}/unit/${nextChapter.unitId}/chapter/${encodeURIComponent(nextChapter.chapterTitle)}`);
     }
+  };
+
+  // Check if there's a previous/next item to navigate to
+  const hasPrevious = () => {
+    if (!chapterId && unitId) {
+      const allUnits = getAllUnitsInOrder();
+      return allUnits.indexOf(parseInt(unitId)) > 0;
+    }
+    return getPreviousChapter() !== null;
+  };
+
+  const hasNext = () => {
+    if (!chapterId && unitId) {
+      const allUnits = getAllUnitsInOrder();
+      return allUnits.indexOf(parseInt(unitId)) < allUnits.length - 1;
+    }
+    return getNextChapter() !== null;
   };
 
   // Keyboard navigation with arrow keys
@@ -400,9 +500,9 @@ const TextbookPage: React.FC<TextbookPageProps> = ({ subject }) => {
       }
 
       if (event.key === 'ArrowLeft') {
-        navigateToPreviousChapter();
+        navigateToPrevious();
       } else if (event.key === 'ArrowRight') {
-        navigateToNextChapter();
+        navigateToNext();
       }
     };
 
@@ -941,9 +1041,33 @@ This textbook covers all the essential concepts and topics for the {subjectConfi
 
   // Render practice quiz section
   const renderPracticeQuiz = () => {
+    const answeredCount = Object.keys(quizSubmitted).length;
+    const correctCount = Object.entries(quizSubmitted).filter(
+      ([idx]) => quizAnswers[parseInt(idx)] === quizQuestions[parseInt(idx)]?.correct
+    ).length;
+
     return (
       <Box mt={8} p={6} bg={quizBgColor} borderRadius="md">
-        <Heading as="h4" size="md" mb={6}>Practice Quiz</Heading>
+        <HStack justify="space-between" mb={6}>
+          <Heading as="h4" size="md">Practice Quiz</Heading>
+          {quizQuestions.length > 0 && (
+            <HStack spacing={4}>
+              {answeredCount > 0 && (
+                <Text fontSize="sm" color="gray.600">
+                  Score: {correctCount}/{answeredCount}
+                </Text>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                colorScheme="purple"
+                onClick={resetQuiz}
+              >
+                Reset Quiz
+              </Button>
+            </HStack>
+          )}
+        </HStack>
 
         {quizQuestions.length === 0 ? (
           <Text color="gray.600">
@@ -1137,8 +1261,8 @@ This textbook covers all the essential concepts and topics for the {subjectConfi
       {/* Floating Navigation Arrows - show on unit and chapter pages */}
       {unitId && (
         <>
-          {/* Previous Chapter Arrow */}
-          {getPreviousChapter() && (
+          {/* Previous Arrow */}
+          {hasPrevious() && (
             <Box
               position="fixed"
               bottom="50%"
@@ -1147,7 +1271,7 @@ This textbook covers all the essential concepts and topics for the {subjectConfi
               zIndex={1000}
             >
               <Button
-                onClick={navigateToPreviousChapter}
+                onClick={navigateToPrevious}
                 colorScheme="blue"
                 variant="solid"
                 size="lg"
@@ -1164,9 +1288,9 @@ This textbook covers all the essential concepts and topics for the {subjectConfi
               </Button>
             </Box>
           )}
-          
-          {/* Next Chapter Arrow */}
-          {getNextChapter() && (
+
+          {/* Next Arrow */}
+          {hasNext() && (
             <Box
               position="fixed"
               bottom="50%"
@@ -1175,7 +1299,7 @@ This textbook covers all the essential concepts and topics for the {subjectConfi
               zIndex={1000}
             >
               <Button
-                onClick={navigateToNextChapter}
+                onClick={navigateToNext}
                 colorScheme="blue"
                 variant="solid"
                 size="lg"

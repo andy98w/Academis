@@ -12,7 +12,7 @@ import {
   useColorModeValue,
 } from '@chakra-ui/react';
 import { useNavigate } from 'react-router-dom';
-import { FaBook, FaRobot, FaChalkboardTeacher } from 'react-icons/fa';
+import { FaBook, FaChalkboardTeacher } from 'react-icons/fa';
 import ChatInterface from '../components/ChatInterface';
 import IconWrapper, { FeatureCardIcon } from '../components/IconWrapper';
 import { getSubjectConfig } from '../config/subjects';
@@ -98,7 +98,7 @@ const SubjectPage: React.FC<SubjectPageProps> = ({ subjectId }) => {
         </Flex>
 
         <Box mb={10}>
-          <SimpleGrid columns={{ base: 1, md: 3 }} spacing={10} mb={10}>
+          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={10} mb={10}>
             <FeatureCard
               title="Interactive Textbook"
               description={`Access complete ${subjectConfig.fullName} content organized by units and chapters.`}
@@ -106,19 +106,13 @@ const SubjectPage: React.FC<SubjectPageProps> = ({ subjectId }) => {
               bgColor={subjectConfig.colors.primary}
               onClick={() => navigate(`/textbook/${subjectId}`)}
             />
-            
-            <FeatureCard
-              title="AI Tutor"
-              description={`Get personalized help and ask questions about any ${subjectConfig.name.toLowerCase()} topic.`}
-              icon={FaRobot}
-              bgColor={subjectConfig.colors.primary}
-            />
-            
+
             <FeatureCard
               title="Practice Questions"
               description="Test your knowledge with AP-style questions and get instant feedback."
               icon={FaChalkboardTeacher}
               bgColor={subjectConfig.colors.primary}
+              onClick={() => navigate(`/practice/${subjectId}`)}
             />
           </SimpleGrid>
           
@@ -135,15 +129,16 @@ const SubjectPage: React.FC<SubjectPageProps> = ({ subjectId }) => {
               in the bottom right corner to ask specific questions about any {subjectConfig.name.toLowerCase()} topic.
             </Text>
             <HStack spacing={4} mt={4}>
-              <Button 
-                colorScheme={subjectConfig.colors.primary.split('.')[0]} 
+              <Button
+                colorScheme={subjectConfig.colors.primary.split('.')[0]}
                 onClick={() => navigate(`/textbook/${subjectId}`)}
               >
                 View Textbook
               </Button>
-              <Button 
-                colorScheme="blue" 
+              <Button
+                colorScheme="blue"
                 variant="outline"
+                onClick={() => navigate(`/practice/${subjectId}`)}
               >
                 Start Practice Quiz
               </Button>

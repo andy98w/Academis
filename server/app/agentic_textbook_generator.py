@@ -357,6 +357,189 @@ TOOL_DEFINITIONS = [
 ]
 
 # ---------------------------------------------------------------------------
+# Subject-specific graph examples
+# ---------------------------------------------------------------------------
+GRAPH_EXAMPLES = {
+    "economics": """
+Example — Production Possibilities Curve:
+{{
+  "chart_type": "line_chart",
+  "description": "PPC showing trade-off between Good X and Good Y",
+  "palette": "cool",
+  "x_axis": {{"label": "Good X (units)", "min": 0, "max": 50}},
+  "y_axis": {{"label": "Good Y (units)", "min": 0, "max": 40}},
+  "series": [
+    {{"label": "PPC", "shape": "concave_frontier", "y_start": 40, "y_end": 0, "style": "solid"}}
+  ],
+  "key_points": [
+    {{"label": "Efficient", "x_fraction": 0.5, "on_series": 0, "style": "dot"}}
+  ]
+}}
+
+Example — Supply and Demand:
+{{
+  "chart_type": "line_chart",
+  "description": "Supply and demand curves with equilibrium",
+  "x_axis": {{"label": "Quantity", "min": 0, "max": 100}},
+  "y_axis": {{"label": "Price ($)", "min": 0, "max": 100}},
+  "series": [
+    {{"label": "Demand", "shape": "linear", "y_start": 90, "y_end": 10, "style": "solid"}},
+    {{"label": "Supply", "shape": "linear", "y_start": 10, "y_end": 90, "style": "solid"}}
+  ],
+  "intersections": [{{"series_a": 0, "series_b": 1, "label": "Equilibrium"}}]
+}}
+
+SUBJECT-SPECIFIC RULES:
+- For PPC curves: use "concave_frontier" shape
+- For supply/demand: demand slopes DOWN, supply slopes UP
+- Mark equilibrium points at intersections
+""",
+    "biology": """
+Example — Enzyme Kinetics (Michaelis-Menten):
+{{
+  "chart_type": "line_chart",
+  "description": "Enzyme reaction rate vs substrate concentration",
+  "palette": "nature",
+  "x_axis": {{"label": "Substrate Concentration [S]", "min": 0, "max": 100}},
+  "y_axis": {{"label": "Reaction Rate (V)", "min": 0, "max": 100}},
+  "series": [
+    {{"label": "Reaction Rate", "shape": "logarithmic", "y_start": 0, "y_end": 90, "style": "solid"}}
+  ],
+  "annotations": [
+    {{"text": "Vmax", "x_fraction": 0.9, "y_fraction": 0.95}},
+    {{"text": "Km", "x_fraction": 0.3, "y_fraction": 0.5}}
+  ]
+}}
+
+Example — Population Growth:
+{{
+  "chart_type": "line_chart",
+  "description": "Logistic population growth over time",
+  "palette": "nature",
+  "x_axis": {{"label": "Time", "min": 0, "max": 100}},
+  "y_axis": {{"label": "Population Size", "min": 0, "max": 100}},
+  "series": [
+    {{"label": "Population", "shape": "sigmoid", "y_start": 5, "y_end": 95, "style": "solid"}}
+  ],
+  "annotations": [
+    {{"text": "Carrying Capacity (K)", "x_fraction": 0.8, "y_fraction": 0.95}}
+  ]
+}}
+
+SUBJECT-SPECIFIC RULES:
+- Use "logarithmic" for saturation curves (enzyme kinetics)
+- Use "sigmoid" for logistic growth
+- Use "exponential_growth" for J-shaped population curves
+""",
+    "physics": """
+Example — Motion (Position vs Time):
+{{
+  "chart_type": "line_chart",
+  "description": "Position of object under constant acceleration",
+  "palette": "cool",
+  "x_axis": {{"label": "Time (s)", "min": 0, "max": 10}},
+  "y_axis": {{"label": "Position (m)", "min": 0, "max": 100}},
+  "series": [
+    {{"label": "Position", "shape": "quadratic", "direction": "accelerating", "y_start": 0, "y_end": 100, "style": "solid"}}
+  ]
+}}
+
+Example — Velocity vs Time:
+{{
+  "chart_type": "line_chart",
+  "description": "Velocity under constant acceleration",
+  "palette": "cool",
+  "x_axis": {{"label": "Time (s)", "min": 0, "max": 10}},
+  "y_axis": {{"label": "Velocity (m/s)", "min": 0, "max": 50}},
+  "series": [
+    {{"label": "Velocity", "shape": "linear", "y_start": 0, "y_end": 50, "style": "solid"}}
+  ],
+  "shaded_regions": [
+    {{"between": [0, "x_axis"], "x_start_frac": 0, "x_end_frac": 1, "label": "Displacement", "alpha": 0.2}}
+  ]
+}}
+
+SUBJECT-SPECIFIC RULES:
+- Use "quadratic" for constant acceleration motion
+- Use "linear" for constant velocity or uniform acceleration
+- Area under v-t curve represents displacement
+""",
+    "chemistry": """
+Example — Reaction Rate vs Concentration:
+{{
+  "chart_type": "line_chart",
+  "description": "First-order reaction concentration over time",
+  "palette": "warm",
+  "x_axis": {{"label": "Time (s)", "min": 0, "max": 100}},
+  "y_axis": {{"label": "Concentration (M)", "min": 0, "max": 100}},
+  "series": [
+    {{"label": "[Reactant]", "shape": "exponential_decay", "y_start": 100, "y_end": 10, "style": "solid"}}
+  ],
+  "annotations": [
+    {{"text": "Half-life", "x_fraction": 0.3, "y_fraction": 0.55}}
+  ]
+}}
+
+Example — Titration Curve:
+{{
+  "chart_type": "line_chart",
+  "description": "pH during acid-base titration",
+  "palette": "warm",
+  "x_axis": {{"label": "Volume of Titrant (mL)", "min": 0, "max": 50}},
+  "y_axis": {{"label": "pH", "min": 0, "max": 14}},
+  "series": [
+    {{"label": "pH", "shape": "sigmoid", "y_start": 2, "y_end": 12, "style": "solid"}}
+  ],
+  "key_points": [
+    {{"label": "Equivalence Point", "x_fraction": 0.5, "on_series": 0, "style": "dot"}}
+  ]
+}}
+
+SUBJECT-SPECIFIC RULES:
+- Use "exponential_decay" for first-order reactions
+- Use "sigmoid" for titration curves
+- Mark half-life and equivalence points
+""",
+    "default": """
+Example — Linear Relationship:
+{{
+  "chart_type": "line_chart",
+  "description": "Linear relationship between X and Y",
+  "x_axis": {{"label": "X Variable", "min": 0, "max": 100}},
+  "y_axis": {{"label": "Y Variable", "min": 0, "max": 100}},
+  "series": [
+    {{"label": "Data", "shape": "linear", "y_start": 10, "y_end": 90, "style": "solid"}}
+  ]
+}}
+
+Example — Exponential Growth:
+{{
+  "chart_type": "line_chart",
+  "description": "Exponential growth pattern",
+  "x_axis": {{"label": "X", "min": 0, "max": 100}},
+  "y_axis": {{"label": "Y", "min": 0, "max": 100}},
+  "series": [
+    {{"label": "Growth", "shape": "exponential_growth", "y_start": 5, "y_end": 95, "style": "solid"}}
+  ]
+}}
+"""
+}
+
+def get_graph_examples(subject_code: str) -> str:
+    """Get subject-specific graph examples for the prompt."""
+    # Map subject codes to categories
+    subject_map = {
+        "micro": "economics",
+        "macro": "economics",
+        "biology": "biology",
+        "physics": "physics",
+        "chemistry": "chemistry",
+    }
+    category = subject_map.get(subject_code, "default")
+    return GRAPH_EXAMPLES.get(category, GRAPH_EXAMPLES["default"])
+
+
+# ---------------------------------------------------------------------------
 # Agent system prompt
 # ---------------------------------------------------------------------------
 SYSTEM_PROMPT = """You are an expert educational content writer creating a chapter for an AP-level textbook.
@@ -390,55 +573,18 @@ Save these tags — you MUST include them in your chapter text.
 ═══ GRAPH SPEC REFERENCE ═══
 When calling create_graph, provide a "spec" parameter as a JSON string.
 Available shapes for series:
-  • concave_frontier — bowed-out quarter-ellipse. Perfect for PPC/PPF curves.
-    y_start = Y-intercept (top), y_end = 0, x goes from x_axis.min to x_axis.max.
+  • concave_frontier — bowed-out quarter-ellipse (trade-off curves, PPCs)
   • linear — straight line from y_start to y_end
-  • quadratic — parabola. Directions: accelerating (t²), decelerating (√t),
-    u_shape (high edges, low center), inverted_u (low edges, high center)
+  • quadratic — parabola. Directions: accelerating, decelerating, u_shape, inverted_u
   • exponential_growth, exponential_decay, logarithmic, inverse, sigmoid, step, constant
 
-Example — Production Possibilities Curve:
-{{
-  "chart_type": "line_chart",
-  "description": "PPC showing trade-off between Good X and Good Y",
-  "palette": "cool",
-  "x_axis": {{"label": "Good X (units)", "min": 0, "max": 50}},
-  "y_axis": {{"label": "Good Y (units)", "min": 0, "max": 40}},
-  "series": [
-    {{"label": "PPC", "shape": "concave_frontier", "y_start": 40, "y_end": 0, "style": "solid"}}
-  ],
-  "key_points": [
-    {{"label": "Efficient (on curve)", "x_fraction": 0.5, "on_series": 0, "style": "dot"}},
-    {{"label": "Inefficient (inside)", "x_fraction": 0.35, "on_series": 0, "style": "dot"}}
-  ],
-  "annotations": [
-    {{"text": "Inefficient", "x_fraction": 0.25, "y_fraction": 0.3}},
-    {{"text": "Unattainable", "x_fraction": 0.8, "y_fraction": 0.8}}
-  ]
-}}
-
-Example — Supply and Demand:
-{{
-  "chart_type": "line_chart",
-  "description": "Supply and demand curves with equilibrium",
-  "palette": "default",
-  "x_axis": {{"label": "Quantity", "min": 0, "max": 100}},
-  "y_axis": {{"label": "Price ($)", "min": 0, "max": 100}},
-  "series": [
-    {{"label": "Demand", "shape": "linear", "y_start": 90, "y_end": 10, "style": "solid"}},
-    {{"label": "Supply", "shape": "linear", "y_start": 10, "y_end": 90, "style": "solid"}}
-  ],
-  "intersections": [{{"series_a": 0, "series_b": 1, "label": "Equilibrium"}}]
-}}
+{graph_examples}
 
 ACCURACY RULES FOR GRAPHS:
 - Set axis ranges to match the REAL numerical values for the concept.
 - Use y_start and y_end to control the EXACT start and end values of curves.
-- For PPC curves: always use "concave_frontier" shape. y_start = max Y-intercept, y_end = 0.
-  x_axis max = max X-intercept.
-- For supply/demand: demand slopes DOWN (y_start > y_end), supply slopes UP (y_start < y_end).
 - Mark key points at CORRECT positions on the curve.
-- Use shaded_regions to highlight surplus, deficit, or trade gains areas.
+- Use shaded_regions to highlight important areas.
 
 ══ PHASE 3: WRITE THE CHAPTER ══
 Only after completing Phases 1 and 2, write the full chapter with this structure:
@@ -454,11 +600,28 @@ Only after completing Phases 1 and 2, write the full chapter with this structure
    in the text, immediately after the paragraph that references them.
    Do NOT group all visuals in one section.
 
+   CRITICAL - TEACH THE METHOD, NOT JUST THE CONCEPT:
+   For any concept that involves calculation or analysis, you MUST teach students HOW to do it:
+
+   a) State the FORMULA or METHOD clearly:
+      "**Opportunity Cost Formula:** Opportunity Cost = Units of Good Given Up ÷ Units of Good Gained"
+
+   b) Provide a CONCRETE worked example with real numbers:
+      "Suppose a factory can produce either 200 cars or 400 trucks. If they choose to make
+      100 more cars (going from 100 to 200), they must give up 200 trucks (going from 400 to 200).
+      The opportunity cost = 200 trucks ÷ 100 cars = **2 trucks per car**."
+
+   c) Explain HOW TO READ tables/graphs for these calculations:
+      "To find opportunity cost from a production table: identify what you gain (change in one good)
+      and what you give up (change in the other good), then divide."
+
+   Students should be able to solve quiz problems after reading your explanation.
+
 3. ## Review Questions
    Write 4 AP-style practice questions:
    **Question 1:** [question]
    A) [option]  B) [option]  C) [option]  D) [option]
-   **Answer:** [letter] - [explanation]
+   **Answer:** [letter] - [detailed explanation with math if applicable]
 
 4. ## Summary
    Start with "**Key Takeaways:**" and write 2-3 paragraphs.
@@ -539,11 +702,15 @@ class AgenticTextbookGenerator:
         )
 
         # Build the system prompt
+        # Get subject-specific graph examples
+        graph_examples = get_graph_examples(subject_code)
+
         system_content = SYSTEM_PROMPT.format(
             chapter_number=chapter_number,
             chapter_title=chapter_title,
             subject=subject,
             chapter_topics=chapter_topics,
+            graph_examples=graph_examples,
         )
 
         messages = [
