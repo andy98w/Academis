@@ -32,14 +32,18 @@ import {
   Th,
   Td,
   TableContainer,
+  useDisclosure,
+  Badge,
 } from '@chakra-ui/react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { FaBook, FaArrowLeft, FaHome, FaCaretDown, FaCaretRight, FaChartLine, FaChevronLeft, FaChevronRight, FaTable } from 'react-icons/fa';
+import { FaBook, FaArrowLeft, FaHome, FaCaretDown, FaCaretRight, FaChartLine, FaChevronLeft, FaChevronRight, FaTable, FaLock } from 'react-icons/fa';
 import { Image } from '@chakra-ui/react';
 import axios from 'axios';
 import ChatInterface from '../components/ChatInterface';
 import IconWrapper, { renderIcon } from '../components/IconWrapper';
 import { getSubjectConfig } from '../config/subjects';
+import { useAuth } from '../context/AuthContext';
+import SignupPromptModal from '../components/SignupPromptModal';
 
 interface Chapter {
   chapter_number: string;
@@ -100,6 +104,10 @@ const TextbookPage: React.FC<TextbookPageProps> = ({ subject }) => {
   const { unitId, chapterId } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
+  const { user } = useAuth();
+  const { isOpen: isSignupModalOpen, onOpen: openSignupModal, onClose: closeSignupModal } = useDisclosure();
+  const [signupModalMessage, setSignupModalMessage] = useState('Create a free account to access all chapters and track your progress.');
+
   const bgColor = useColorModeValue('white', 'gray.800');
   const solutionsBgColor = useColorModeValue('blue.50', 'blue.900');
   const quizBgColor = useColorModeValue('purple.50', 'purple.900');
@@ -108,6 +116,22 @@ const TextbookPage: React.FC<TextbookPageProps> = ({ subject }) => {
 
   // Get subject configuration
   const subjectConfig = getSubjectConfig(subject);
+
+  // Free chapters: 1.1 and 1.2 only
+  const FREE_CHAPTER_LIMIT = 1.2;
+  const MAX_FREE_QUIZ_ANSWERS = 5;
+
+  // Check if a chapter number is locked (requires signup)
+  const isChapterLocked = (chapterNumber: string): boolean => {
+    if (user) return false; // Authenticated users have full access
+    const num = parseFloat(chapterNumber);
+    return !isNaN(num) && num > FREE_CHAPTER_LIMIT;
+  };
+
+  // Get total quiz answers submitted (for limiting free users)
+  const getTotalQuizAnswersSubmitted = (): number => {
+    return Object.keys(quizSubmitted).filter(key => quizSubmitted[parseInt(key)]).length;
+  };
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -217,6 +241,20 @@ const TextbookPage: React.FC<TextbookPageProps> = ({ subject }) => {
           tocCache.current[subject] = tocData;
         }
         setTableOfContents(tocData);
+
+        // Check if trying to access a locked chapter via direct URL
+        if (chapterId && unitId && !user) {
+          const tocChapter = tocData.units?.[unitId]?.chapters?.find(
+            (ch: Chapter) => ch.title.toLowerCase() === decodeURIComponent(chapterId).toLowerCase()
+          );
+          if (tocChapter && isChapterLocked(tocChapter.chapter_number)) {
+            setSignupModalMessage('Sign up to unlock this chapter and access all content.');
+            openSignupModal();
+            navigate(`/textbook/${subject}`);
+            setLoading(false);
+            return;
+          }
+        }
 
         // If we have a unitId, fetch content
         if (unitId) {
@@ -577,26 +615,42 @@ This textbook covers all the essential concepts and topics for the {subjectConfi
                 </h2>
                 <AccordionPanel pb={4}>
                   <VStack align="stretch" spacing={3} pl={2}>
-                    {unit.chapters && Array.isArray(unit.chapters) && unit.chapters.map((chapter, idx) => (
-                      <Button 
-                        key={idx}
-                        variant="ghost" 
-                        justifyContent="flex-start"
-                        leftIcon={<IconWrapper icon={FaBook} size={16} />}
-                        onClick={() => navigate(`/textbook/${subject}/unit/${unitId}/chapter/${encodeURIComponent(chapter.title)}`)}
-                        py={2}
-                        px={4}
-                        borderRadius="md"
-                        _hover={{ bg: 'blue.50' }}
-                      >
-                        {chapter.chapter_number && (
-                          <Text as="span" fontWeight="bold" mr={2}>
-                            {chapter.chapter_number}:
-                          </Text>
-                        )}
-                        {chapter.title}
-                      </Button>
-                    ))}
+                    {unit.chapters && Array.isArray(unit.chapters) && unit.chapters.map((chapter, idx) => {
+                      const locked = isChapterLocked(chapter.chapter_number);
+                      return (
+                        <Button
+                          key={idx}
+                          variant="ghost"
+                          justifyContent="flex-start"
+                          leftIcon={locked ? <IconWrapper icon={FaLock} size={14} /> : <IconWrapper icon={FaBook} size={16} />}
+                          onClick={() => {
+                            if (locked) {
+                              setSignupModalMessage('Sign up to unlock this chapter and access all content.');
+                              openSignupModal();
+                            } else {
+                              navigate(`/textbook/${subject}/unit/${unitId}/chapter/${encodeURIComponent(chapter.title)}`);
+                            }
+                          }}
+                          py={2}
+                          px={4}
+                          borderRadius="md"
+                          _hover={{ bg: locked ? 'gray.100' : 'blue.50' }}
+                          opacity={locked ? 0.7 : 1}
+                        >
+                          {chapter.chapter_number && (
+                            <Text as="span" fontWeight="bold" mr={2}>
+                              {chapter.chapter_number}:
+                            </Text>
+                          )}
+                          {chapter.title}
+                          {locked && (
+                            <Badge ml={2} colorScheme="gray" fontSize="xs">
+                              Sign up to unlock
+                            </Badge>
+                          )}
+                        </Button>
+                      );
+                    })}
                     <Box pt={2}>
                       <Button 
                         colorScheme="blue" 
@@ -1069,6 +1123,18 @@ This textbook covers all the essential concepts and topics for the {subjectConfi
           )}
         </HStack>
 
+        {/* Free user quiz limit message */}
+        {!user && quizQuestions.length > 0 && (
+          <Alert status="info" mb={4} borderRadius="md">
+            <AlertIcon />
+            <Text fontSize="sm">
+              {getTotalQuizAnswersSubmitted() >= MAX_FREE_QUIZ_ANSWERS
+                ? 'You\'ve used all 5 free practice questions. Sign up to continue!'
+                : `Free preview: ${MAX_FREE_QUIZ_ANSWERS - getTotalQuizAnswersSubmitted()} questions remaining. Sign up for unlimited access.`}
+            </Text>
+          </Alert>
+        )}
+
         {quizQuestions.length === 0 ? (
           <Text color="gray.600">
             No practice quiz available for this chapter yet. Regenerate the chapter to create one.
@@ -1179,7 +1245,15 @@ This textbook covers all the essential concepts and topics for the {subjectConfi
                     colorScheme="blue"
                     size="sm"
                     isDisabled={quizAnswers[idx] === undefined}
-                    onClick={() => setQuizSubmitted(prev => ({ ...prev, [idx]: true }))}
+                    onClick={() => {
+                      // Check if free user has exceeded quiz limit
+                      if (!user && getTotalQuizAnswersSubmitted() >= MAX_FREE_QUIZ_ANSWERS) {
+                        setSignupModalMessage('Sign up to answer unlimited practice questions and track your progress.');
+                        openSignupModal();
+                        return;
+                      }
+                      setQuizSubmitted(prev => ({ ...prev, [idx]: true }));
+                    }}
                   >
                     Check Answer
                   </Button>
@@ -1320,10 +1394,17 @@ This textbook covers all the essential concepts and topics for the {subjectConfi
       )}
 
       {/* Floating Chat Interface */}
-      <ChatInterface 
-        subject={subject} 
+      <ChatInterface
+        subject={subject}
         floatingMode={true}
         defaultOpen={false}
+      />
+
+      {/* Signup Prompt Modal */}
+      <SignupPromptModal
+        isOpen={isSignupModalOpen}
+        onClose={closeSignupModal}
+        message={signupModalMessage}
       />
     </Box>
   );

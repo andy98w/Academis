@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -384,4 +384,121 @@ async def get_quiz(subject: str, chapter_id: str):
 
     except Exception as e:
         logger.error(f"Error getting quiz: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# User Progress Endpoints (requires authentication)
+# ============================================================================
+
+from .auth_middleware import get_current_user, get_optional_user, UserInfo
+from . import user_service
+
+class SaveProgressRequest(BaseModel):
+    subject: str
+    chapter_id: str
+    answers: dict
+    submitted: dict
+    score: Optional[int] = None
+    total: Optional[int] = None
+
+class SaveScrollRequest(BaseModel):
+    subject: str
+    chapter_id: str
+    scroll_position: int
+
+
+@app.post("/api/user/progress", response_model=dict)
+async def save_user_progress(
+    request: SaveProgressRequest,
+    user: UserInfo = Depends(get_current_user)
+):
+    """Save quiz progress for the authenticated user."""
+    try:
+        result = await user_service.save_quiz_progress(
+            user_id=user.uid,
+            subject=request.subject,
+            chapter_id=request.chapter_id,
+            answers=request.answers,
+            submitted=request.submitted,
+            score=request.score,
+            total=request.total,
+        )
+        return {"message": "Progress saved", "data": result}
+    except Exception as e:
+        logger.error(f"Error saving progress: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/user/scroll", response_model=dict)
+async def save_scroll_position(
+    request: SaveScrollRequest,
+    user: UserInfo = Depends(get_current_user)
+):
+    """Save scroll position for the authenticated user."""
+    try:
+        result = await user_service.save_scroll_position(
+            user_id=user.uid,
+            subject=request.subject,
+            chapter_id=request.chapter_id,
+            scroll_position=request.scroll_position,
+        )
+        return {"message": "Scroll position saved", "data": result}
+    except Exception as e:
+        logger.error(f"Error saving scroll position: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/user/progress", response_model=dict)
+async def get_user_progress(
+    subject: Optional[str] = None,
+    user: UserInfo = Depends(get_current_user)
+):
+    """Get all progress for the authenticated user."""
+    try:
+        progress = await user_service.get_user_progress(
+            user_id=user.uid,
+            subject=subject,
+        )
+        return {"progress": progress}
+    except Exception as e:
+        logger.error(f"Error getting progress: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/user/progress/{subject}/{chapter_id}", response_model=dict)
+async def get_chapter_progress(
+    subject: str,
+    chapter_id: str,
+    user: UserInfo = Depends(get_current_user)
+):
+    """Get progress for a specific chapter."""
+    try:
+        quiz_progress = await user_service.get_chapter_quiz_progress(
+            user_id=user.uid,
+            subject=subject,
+            chapter_id=chapter_id,
+        )
+        scroll_position = await user_service.get_chapter_scroll_position(
+            user_id=user.uid,
+            subject=subject,
+            chapter_id=chapter_id,
+        )
+        return {
+            "quiz": quiz_progress,
+            "scroll_position": scroll_position,
+        }
+    except Exception as e:
+        logger.error(f"Error getting chapter progress: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/user/stats", response_model=dict)
+async def get_user_stats(user: UserInfo = Depends(get_current_user)):
+    """Get overall statistics for the authenticated user."""
+    try:
+        stats = await user_service.get_user_stats(user.uid)
+        return stats
+    except Exception as e:
+        logger.error(f"Error getting user stats: {e}")
         raise HTTPException(status_code=500, detail=str(e))

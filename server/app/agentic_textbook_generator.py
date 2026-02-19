@@ -560,15 +560,24 @@ Before writing anything, call these tools to gather information:
 
 After calling research tools, you will receive their results. Then proceed to Phase 2.
 
-══ PHASE 2: CREATE VISUALIZATIONS ══
-After research, you MUST create visual aids BEFORE writing the chapter:
-  • create_graph — you provide a FULL JSON rendering specification (see below).
-    You MUST call this at least once. Be PRECISE about axis ranges, curve shapes,
-    and key points — you are directly controlling the rendering.
-  • create_table — call this for any numerical comparisons or tabular data.
+══ VISUALIZATION TOOLS ══
+Use create_graph and create_table DURING writing, integrated naturally into the text.
 
-Each tool returns a placeholder tag like [GENERATED_GRAPH:graph_1].
-Save these tags — you MUST include them in your chapter text.
+WHEN TO CREATE A GRAPH (you SHOULD create one):
+  • Supply, demand, or equilibrium curves
+  • Production possibilities curves/frontiers
+  • Cost curves (MC, ATC, AVC, etc.)
+  • Population growth, carrying capacity
+  • Enzyme kinetics, reaction rates
+  • Any topic where visualizing a curve/relationship is essential to understanding
+
+WHEN TO SKIP GRAPHS (no visualization needed):
+  • Molecular structures, cell organelles
+  • Definitions and terminology chapters
+  • Historical context, economic systems overview
+  • Topics that are purely conceptual without quantitative relationships
+
+Tool returns: create_graph → [GENERATED_GRAPH:graph_1], create_table → [GENERATED_TABLE:table_1]
 
 ═══ GRAPH SPEC REFERENCE ═══
 When calling create_graph, provide a "spec" parameter as a JSON string.
@@ -586,8 +595,10 @@ ACCURACY RULES FOR GRAPHS:
 - Mark key points at CORRECT positions on the curve.
 - Use shaded_regions to highlight important areas.
 
-══ PHASE 3: WRITE THE CHAPTER ══
-Only after completing Phases 1 and 2, write the full chapter with this structure:
+══ PHASE 2: WRITE THE CHAPTER ══
+After research, write the chapter. Create graphs/tables AS YOU WRITE when needed.
+
+STRUCTURE:
 
 1. ## Introduction
    Write 2-3 paragraphs introducing the chapter's concepts.
@@ -596,9 +607,22 @@ Only after completing Phases 1 and 2, write the full chapter with this structure
    Write 2-4 paragraphs per section, 3-5 sentences each.
    Use **bold** for key terms on first introduction.
    Include specific examples from your research.
-   Place [GENERATED_GRAPH:...] or [GENERATED_TABLE:...] placeholders INLINE
-   in the text, immediately after the paragraph that references them.
-   Do NOT group all visuals in one section.
+
+   SEAMLESS GRAPH INTEGRATION: When you reach a concept that needs visualization,
+   STOP writing, call create_graph or create_table, then place the returned
+   placeholder tag immediately and continue writing. Example flow:
+
+   "The law of demand states that as price increases, quantity demanded decreases,
+   all else equal. This inverse relationship creates a downward-sloping curve."
+
+   [Call create_graph here for demand curve]
+
+   [GENERATED_GRAPH:graph_1]
+
+   "As shown in the graph above, when price falls from P1 to P2, consumers
+   purchase more units, moving from Q1 to Q2 along the demand curve."
+
+   This creates natural flow — introduce concept, show visual, explain visual.
 
    CRITICAL - TEACH THE METHOD, NOT JUST THE CONCEPT:
    For any concept that involves calculation or analysis, you MUST teach students HOW to do it:
@@ -618,31 +642,31 @@ Only after completing Phases 1 and 2, write the full chapter with this structure
    Students should be able to solve quiz problems after reading your explanation.
 
 3. ## Review Questions
-   Write 4 AP-style practice questions:
+   Write 4 AP-style practice questions (separate from the quiz that's auto-generated):
    **Question 1:** [question]
    A) [option]  B) [option]  C) [option]  D) [option]
-   **Answer:** [letter] - [detailed explanation with math if applicable]
+   **Answer:** [letter] - [brief explanation]
 
 4. ## Summary
    Start with "**Key Takeaways:**" and write 2-3 paragraphs.
 
 ═══════════════════════════════════════════════════════
 CRITICAL RULES:
-- You MUST call create_graph at least once. Do NOT skip visualizations.
-- Include the exact placeholder tags returned by create_graph/create_table in your text.
-- Place placeholders INLINE after the paragraph that references them, NOT all in one section.
+- If the chapter involves curves/graphs (demand, supply, PPC, costs, growth), you MUST create them.
+- Integrate visuals seamlessly: introduce concept → call create_graph → place placeholder → explain graph.
+- For conceptual topics (definitions, structures, history), skip graphs entirely.
 - Use ## for section headings only. Do NOT use ### or other heading levels.
-- Do NOT use markdown headings inside tool call arguments.
 - Stay strictly within the chapter's topic boundaries.
 """
 
 # The nudge message sent if the agent hasn't created any graphs/tables
+# Now optional - only suggests visuals if they would genuinely help
 VISUAL_NUDGE = (
-    "You have not yet called create_graph or create_table. "
-    "You MUST create at least one visualization before writing the chapter. "
-    "Call create_graph now with a description of the most important visual "
-    "concept in this chapter. Then call create_table if there are any "
-    "comparisons or data that should be shown in a table."
+    "You have not created any visualizations yet. Consider: does this chapter "
+    "have quantitative relationships (curves, rates, comparisons) that would "
+    "genuinely benefit from a graph or table? If yes, create one now. "
+    "If the topic is primarily conceptual, it's fine to skip visualizations "
+    "and proceed directly to writing the chapter."
 )
 
 
@@ -677,6 +701,38 @@ class AgenticTextbookGenerator:
     def __init__(self):
         self.client = AsyncOpenAI()
         self.model = "gpt-4o"
+
+    async def _check_if_graph_needed(self, chapter_title: str, subject: str) -> str:
+        """Use LLM to determine if this chapter topic needs a graph. Returns instruction or empty string."""
+        try:
+            response = await self.client.chat.completions.create(
+                model="gpt-4o-mini",  # Fast and cheap for this simple check
+                messages=[{
+                    "role": "user",
+                    "content": f"""Does this textbook chapter need a quantitative graph/chart to be properly understood?
+
+Chapter: "{chapter_title}" (Subject: {subject})
+
+Answer with ONLY one of:
+- "YES: [type of graph needed]" if the topic involves curves, rates, relationships that benefit from visualization (e.g., supply/demand curves, growth curves, cost curves, kinetics)
+- "NO" if the topic is primarily conceptual, definitional, or structural (e.g., cell organelles, historical context, terminology)
+
+Be conservative - only say YES if a graph genuinely helps understanding."""
+                }],
+                max_tokens=50,
+                temperature=0,
+            )
+            answer = response.choices[0].message.content.strip()
+            logger.info(f"[Agent] Graph check for '{chapter_title}': {answer}")
+
+            if answer.upper().startswith("YES"):
+                # Extract the graph type suggestion
+                graph_type = answer[4:].strip(": ") if len(answer) > 4 else "appropriate visualization"
+                return f"You MUST create a graph showing {graph_type} using create_graph. "
+            return ""
+        except Exception as e:
+            logger.warning(f"[Agent] Graph check failed: {e}, defaulting to optional")
+            return ""
 
     async def generate_chapter(
         self,
@@ -713,17 +769,20 @@ class AgenticTextbookGenerator:
             graph_examples=graph_examples,
         )
 
+        # Determine if this topic requires specific graphs (dynamic LLM check)
+        graph_instruction = await self._check_if_graph_needed(chapter_title, subject)
+
+        user_content = (
+            f"Write chapter {chapter_number}: {chapter_title}. "
+            "Start by calling search_web and query_textbook to gather information. "
+        )
+        if graph_instruction:
+            user_content += graph_instruction
+        user_content += "Then write the complete chapter."
+
         messages = [
             {"role": "system", "content": system_content},
-            {
-                "role": "user",
-                "content": (
-                    f"Write chapter {chapter_number}: {chapter_title}. "
-                    "Start by calling search_web and query_textbook to gather "
-                    "information, then create visualizations with create_graph "
-                    "and/or create_table, and finally write the complete chapter."
-                ),
-            },
+            {"role": "user", "content": user_content},
         ]
 
         logger.info(
@@ -732,8 +791,9 @@ class AgenticTextbookGenerator:
 
         max_iterations = 25
         iteration = 0
-        visual_nudge_sent = False
         final_text = ""
+        graph_nudge_sent = False
+        requires_graph = bool(graph_instruction)  # True if this topic needs a graph
 
         while iteration < max_iterations:
             iteration += 1
@@ -810,37 +870,48 @@ class AgenticTextbookGenerator:
 
             # Check: did the agent create any visuals?
             has_visuals = len(_generated_assets) > 0
-            has_placeholders = bool(
-                re.search(r"\[GENERATED_(?:GRAPH|TABLE):\w+\]", final_text)
-            )
 
-            if has_visuals or has_placeholders:
+            # Only count placeholders that match ACTUAL generated assets
+            # (model sometimes writes fake placeholders without calling tools)
+            valid_placeholders = False
+            if has_visuals:
+                for asset_id in _generated_assets.keys():
+                    if f"[GENERATED_GRAPH:{asset_id}]" in final_text or f"[GENERATED_TABLE:{asset_id}]" in final_text:
+                        valid_placeholders = True
+                        break
+
+            if has_visuals and valid_placeholders:
                 # Agent created visuals and included them — we're done
                 logger.info(
                     f"[Agent] Finished with {len(_generated_assets)} assets"
                 )
                 break
 
-            if not visual_nudge_sent:
-                # Agent wrote text but didn't create any visuals.
-                # Nudge it to create them.
-                visual_nudge_sent = True
+            # No visuals created
+            if requires_graph and not graph_nudge_sent:
+                # This topic NEEDS a graph but none was created — nudge the model
+                graph_nudge_sent = True
                 logger.info(
-                    "[Agent] No visuals found — sending nudge to create them"
+                    "[Agent] Topic requires graph but none created — sending nudge"
                 )
                 messages.append({
                     "role": "user",
-                    "content": VISUAL_NUDGE,
+                    "content": (
+                        "STOP. You have not created the required graph yet. "
+                        "Before writing the chapter, you MUST call create_graph "
+                        "to create the visualization. Call create_graph NOW with "
+                        "the appropriate spec for this topic, then rewrite the chapter "
+                        "with the graph placeholder integrated into the text."
+                    ),
                 })
-                # Clear final_text so the agent rewrites with visuals
-                final_text = ""
+                final_text = ""  # Clear so model rewrites with graph
                 continue
-            else:
-                # Already nudged once — accept what we have
-                logger.warning(
-                    "[Agent] Still no visuals after nudge — accepting output"
-                )
-                break
+
+            # Topic doesn't need graphs, or already nudged — accept output
+            logger.info(
+                "[Agent] Finished without visuals (topic may not need them)"
+            )
+            break
 
         if not final_text:
             logger.error("[Agent] No output produced")

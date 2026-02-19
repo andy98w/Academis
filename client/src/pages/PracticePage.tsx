@@ -12,6 +12,7 @@ import {
   Alert,
   AlertIcon,
   useColorModeValue,
+  useDisclosure,
   Select,
   Badge,
   Progress,
@@ -29,6 +30,8 @@ import { FaArrowLeft, FaRedo, FaCheck, FaTimes } from 'react-icons/fa';
 import axios from 'axios';
 import IconWrapper from '../components/IconWrapper';
 import { getSubjectConfig } from '../config/subjects';
+import { useAuth } from '../context/AuthContext';
+import SignupPromptModal from '../components/SignupPromptModal';
 
 interface QuizQuestion {
   type: 'text' | 'table' | 'graph';
@@ -57,6 +60,8 @@ interface PracticePageProps {
 
 const PracticePage: React.FC<PracticePageProps> = ({ subject }) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { isOpen: isSignupModalOpen, onOpen: openSignupModal, onClose: closeSignupModal } = useDisclosure();
   const subjectConfig = getSubjectConfig(subject);
 
   const [loading, setLoading] = useState(true);
@@ -69,6 +74,8 @@ const PracticePage: React.FC<PracticePageProps> = ({ subject }) => {
   const [score, setScore] = useState(0);
   const [answered, setAnswered] = useState(0);
   const [unitFilter, setUnitFilter] = useState<string>('all');
+
+  const MAX_FREE_QUIZ_ANSWERS = 5;
 
   const bgColor = useColorModeValue('white', 'gray.800');
   const correctBgColor = useColorModeValue('green.100', 'green.800');
@@ -128,6 +135,13 @@ const PracticePage: React.FC<PracticePageProps> = ({ subject }) => {
 
   const handleCheckAnswer = () => {
     if (selectedAnswer === null) return;
+
+    // Check if free user has exceeded quiz limit
+    if (!user && answered >= MAX_FREE_QUIZ_ANSWERS) {
+      openSignupModal();
+      return;
+    }
+
     setShowResult(true);
     setAnswered(prev => prev + 1);
     if (selectedAnswer === currentQuestion.correct) {
@@ -229,6 +243,18 @@ const PracticePage: React.FC<PracticePageProps> = ({ subject }) => {
               </Box>
             )}
           </Box>
+
+          {/* Free user quiz limit message */}
+          {!user && !loading && filteredQuestions.length > 0 && (
+            <Alert status="info" borderRadius="md">
+              <AlertIcon />
+              <Text fontSize="sm">
+                {answered >= MAX_FREE_QUIZ_ANSWERS
+                  ? 'You\'ve used all 5 free practice questions. Sign up to continue!'
+                  : `Free preview: ${MAX_FREE_QUIZ_ANSWERS - answered} questions remaining. Sign up for unlimited access.`}
+              </Text>
+            </Alert>
+          )}
 
           {/* Loading/Error states */}
           {loading ? (
@@ -400,6 +426,13 @@ const PracticePage: React.FC<PracticePageProps> = ({ subject }) => {
           ) : null}
         </VStack>
       </Container>
+
+      {/* Signup Prompt Modal */}
+      <SignupPromptModal
+        isOpen={isSignupModalOpen}
+        onClose={closeSignupModal}
+        message="Sign up to answer unlimited practice questions and track your progress across all devices."
+      />
     </Box>
   );
 };

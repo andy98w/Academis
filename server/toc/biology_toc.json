@@ -62,21 +62,371 @@
         },
         {
           "chapter_number": "2.2",
-          "title": "Cell Structure and Function",
+          "title": "Cell Membranes",
           "topics": [
             "Plasma membrane: Phospholipid bilayer structure",
             "Membrane proteins: Integral and peripheral proteins",
             "Fluid mosaic model: Membrane organization and fluidity",
-            "Cell compartmentalization: Organelle functions"
+            "Selective permeability: What can pass through membranes"
           ]
         },
         {
           "chapter_number": "2.3",
-          "title": "Cell Size",
+          "title": "Cell Size and Surface Area to Volume Ratio",
           "topics": [
             "Surface area to volume ratio: Limits on cell size",
             "Diffusion and cell efficiency: Why cells must remain small",
             "Adaptations for increased surface area: Microvilli, folded membranes"
+          ]
+        },
+        {
+          "chapter_number": "2.4",
+          "title": "Membrane Transport",
+          "topics": [
+            "Passive transport: Diffusion, osmosis, facilitated diffusion",
+            "Active transport: ATP-powered pumps, sodium-potassium pump",
+            "Bulk transport: Endocytosis and exocytosis",
+            "Tonicity: Hypertonic, hypotonic, isotonic solutions"
+          ]
+        },
+        {
+          "chapter_number": "2.5",
+          "title": "Membrane Permeability and Compartmentalization",
+          "topics": [
+            "Compartmentalization advantages: Specialized microenvironments",
+            "Endomembrane system: ER, Golgi, lysosomes, vesicles",
+            "Organelle membranes: Double membranes of mitochondria and chloroplasts"
+          ]
+        }
+      ]
+    },
+    "3": {
+      "title": "Cellular Energetics",
+      "chapters": [
+        {
+          "chapter_number": "3.1",
+          "title": "Enzymes and Metabolism",
+          "topics": [
+            "Enzyme structure: Active sites and substrate specificity",
+            "Enzyme function: Lowering activation energy",
+            "Factors affecting enzyme activity: Temperature, pH, concentration",
+            "Enzyme regulation: Competitive and noncompetitive inhibition, allosteric regulation"
+          ]
+        },
+        {
+          "chapter_number": "3.2",
+          "title": "Cellular Energy and ATP",
+          "topics": [
+            "ATP structure: Adenine, ribose, three phosphate groups",
+            "ATP hydrolysis: Release of energy for cellular work",
+            "ATP regeneration: ADP + Pi → ATP",
+            "Coupling reactions: Endergonic and exergonic reactions"
+          ]
+        },
+        {
+          "chapter_number": "3.3",
+          "title": "Photosynthesis",
+          "topics": [
+            "Overview of photosynthesis: 6CO2 + 6H2O → C6H12O6 + 6O2",
+            "Light reactions: Photosystems I and II, electron transport chain, chemiosmosis",
+            "Calvin cycle: Carbon fixation, reduction, regeneration of RuBP",
+            "Chloroplast structure: Thylakoids, grana, stroma"
+          ]
+        },
+        {
+          "chapter_number": "3.4",
+          "title": "Cellular Respiration",
+          "topics": [
+            "Overview of cellular respiration: C6H12O6 + 6O2 → 6CO2 + 6H2O + ATP",
+            "Glycolysis: Glucose breakdown in cytoplasm",
+            "Krebs cycle: Acetyl-CoA oxidation in mitochondrial matrix",
+            "Oxidative phosphorylation: Electron transport chain and chemiosmosis"
+          ]
+        },
+        {
+          "chapter_number": "3.5",
+          "title": "Fermentation and Anaerobic Respiration",
+          "topics": [
+            "Anaerobic pathways: When oxygen is absent",
+            "Lactic acid fermentation: Muscle cells and bacteria",
+            "Alcoholic fermentation: Yeast and some bacteria",
+            "ATP yield comparison: Aerobic vs anaerobic"
+          ]
+        }
+      ]
+    },
+    "4": {
+      "title": "Cell Communication and Cell Cycle",
+      "chapters": [
+        {
+          "chapter_number": "4.1",
+          "title": "Cell Signaling",
+          "topics": [
+            "Signal transduction pathways: Reception, transduction, response",
+            "Types of signaling: Autocrine, paracrine, endocrine",
+            "Ligands and receptors: Specificity of cell communication",
+            "Second messengers: cAMP, calcium ions"
+          ]
+        },
+        {
+          "chapter_number": "4.2",
+          "title": "Signal Transduction",
+          "topics": [
+            "G protein-coupled receptors: Structure and function",
+            "Receptor tyrosine kinases: Phosphorylation cascades",
+            "Amplification of signals: Enzyme cascades",
+            "Cellular responses: Gene expression, enzyme activation, cytoskeletal changes"
+          ]
+        },
+        {
+          "chapter_number": "4.3",
+          "title": "Feedback Mechanisms",
+          "topics": [
+            "Negative feedback: Maintaining homeostasis",
+            "Positive feedback: Amplifying responses",
+            "Examples in physiology: Blood glucose regulation, childbirth, blood clotting"
+          ]
+        },
+        {
+          "chapter_number": "4.4",
+          "title": "The Cell Cycle",
+          "topics": [
+            "Phases of the cell cycle: G1, S, G2, M phases",
+            "Interphase: Cell growth and DNA replication",
+            "Mitosis: Prophase, metaphase, anaphase, telophase",
+            "Cytokinesis: Division of cytoplasm"
+          ]
+        },
+        {
+          "chapter_number": "4.5",
+          "title": "Cell Cycle Regulation",
+          "topics": [
+            "Checkpoints: G1, G2, and M checkpoints",
+            "Cyclins and cyclin-dependent kinases (CDKs)",
+            "Tumor suppressors: p53 and Rb",
+            "Cancer: Uncontrolled cell division, oncogenes"
+          ]
+        }
+      ]
+    },
+    "5": {
+      "title": "Heredity",
+      "chapters": [
+        {
+          "chapter_number": "5.1",
+          "title": "Meiosis",
+          "topics": [
+            "Meiosis overview: Production of haploid gametes",
+            "Meiosis I: Homologous chromosome separation",
+            "Meiosis II: Sister chromatid separation",
+            "Genetic variation: Crossing over, independent assortment, random fertilization"
+          ]
+        },
+        {
+          "chapter_number": "5.2",
+          "title": "Meiosis and Genetic Diversity",
+          "topics": [
+            "Crossing over: Exchange of genetic material between homologs",
+            "Independent assortment: Random orientation of homologous pairs",
+            "Sources of variation: Mutation, sexual reproduction",
+            "Comparison of mitosis and meiosis"
+          ]
+        },
+        {
+          "chapter_number": "5.3",
+          "title": "Mendelian Genetics",
+          "topics": [
+            "Mendel's laws: Segregation and independent assortment",
+            "Monohybrid crosses: Single trait inheritance",
+            "Dihybrid crosses: Two trait inheritance",
+            "Punnett squares: Predicting offspring ratios"
+          ]
+        },
+        {
+          "chapter_number": "5.4",
+          "title": "Non-Mendelian Genetics",
+          "topics": [
+            "Incomplete dominance: Blended phenotypes",
+            "Codominance: Both alleles expressed",
+            "Multiple alleles: ABO blood types",
+            "Polygenic inheritance: Continuous variation",
+            "Epistasis: Gene interactions"
+          ]
+        },
+        {
+          "chapter_number": "5.5",
+          "title": "Chromosomal Inheritance",
+          "topics": [
+            "Sex-linked traits: X-linked inheritance patterns",
+            "Chromosomal abnormalities: Nondisjunction, aneuploidy",
+            "Linked genes: Genes on the same chromosome",
+            "Genetic mapping: Recombination frequencies"
+          ]
+        }
+      ]
+    },
+    "6": {
+      "title": "Gene Expression and Regulation",
+      "chapters": [
+        {
+          "chapter_number": "6.1",
+          "title": "DNA Structure and Replication",
+          "topics": [
+            "DNA structure: Double helix, nucleotide composition",
+            "Semiconservative replication: Meselson-Stahl experiment",
+            "Replication machinery: Helicase, primase, DNA polymerase, ligase",
+            "Leading and lagging strands: Okazaki fragments"
+          ]
+        },
+        {
+          "chapter_number": "6.2",
+          "title": "Transcription and RNA Processing",
+          "topics": [
+            "Transcription: DNA to RNA",
+            "RNA polymerase: Initiation, elongation, termination",
+            "mRNA processing: 5' cap, poly-A tail, splicing",
+            "Types of RNA: mRNA, tRNA, rRNA"
+          ]
+        },
+        {
+          "chapter_number": "6.3",
+          "title": "Translation",
+          "topics": [
+            "Genetic code: Codons and amino acids",
+            "Ribosome structure: Large and small subunits",
+            "Translation process: Initiation, elongation, termination",
+            "tRNA: Anticodons and amino acid attachment"
+          ]
+        },
+        {
+          "chapter_number": "6.4",
+          "title": "Gene Regulation",
+          "topics": [
+            "Prokaryotic regulation: Operons (lac operon, trp operon)",
+            "Eukaryotic regulation: Transcription factors, enhancers, silencers",
+            "Epigenetics: DNA methylation, histone modification",
+            "Post-transcriptional regulation: miRNA, alternative splicing"
+          ]
+        },
+        {
+          "chapter_number": "6.5",
+          "title": "Mutations and Biotechnology",
+          "topics": [
+            "Types of mutations: Point mutations, insertions, deletions, frameshift",
+            "Effects of mutations: Silent, missense, nonsense",
+            "Biotechnology tools: PCR, gel electrophoresis, DNA sequencing",
+            "Genetic engineering: Recombinant DNA, CRISPR-Cas9"
+          ]
+        }
+      ]
+    },
+    "7": {
+      "title": "Natural Selection",
+      "chapters": [
+        {
+          "chapter_number": "7.1",
+          "title": "Evolution and Natural Selection",
+          "topics": [
+            "Darwin's theory: Descent with modification",
+            "Natural selection: Differential survival and reproduction",
+            "Fitness: Reproductive success",
+            "Adaptation: Traits that increase survival"
+          ]
+        },
+        {
+          "chapter_number": "7.2",
+          "title": "Evidence for Evolution",
+          "topics": [
+            "Fossil record: Transitional forms, dating methods",
+            "Comparative anatomy: Homologous and analogous structures",
+            "Molecular evidence: DNA and protein sequence comparisons",
+            "Biogeography: Distribution of species"
+          ]
+        },
+        {
+          "chapter_number": "7.3",
+          "title": "Population Genetics",
+          "topics": [
+            "Gene pools: Allele frequencies in populations",
+            "Hardy-Weinberg equilibrium: Conditions and equations",
+            "Microevolution: Changes in allele frequencies",
+            "Genetic drift: Bottleneck and founder effects"
+          ]
+        },
+        {
+          "chapter_number": "7.4",
+          "title": "Mechanisms of Evolution",
+          "topics": [
+            "Mutation: Ultimate source of genetic variation",
+            "Gene flow: Migration between populations",
+            "Natural selection types: Directional, stabilizing, disruptive",
+            "Sexual selection: Mate choice and competition"
+          ]
+        },
+        {
+          "chapter_number": "7.5",
+          "title": "Speciation and Macroevolution",
+          "topics": [
+            "Species concept: Biological species definition",
+            "Reproductive isolation: Prezygotic and postzygotic barriers",
+            "Allopatric speciation: Geographic isolation",
+            "Sympatric speciation: Speciation without geographic separation",
+            "Patterns of evolution: Adaptive radiation, convergent evolution"
+          ]
+        }
+      ]
+    },
+    "8": {
+      "title": "Ecology",
+      "chapters": [
+        {
+          "chapter_number": "8.1",
+          "title": "Ecology Introduction and Population Ecology",
+          "topics": [
+            "Levels of ecology: Organism, population, community, ecosystem, biosphere",
+            "Population characteristics: Size, density, distribution",
+            "Population growth: Exponential and logistic models",
+            "Carrying capacity: Environmental limits"
+          ]
+        },
+        {
+          "chapter_number": "8.2",
+          "title": "Community Ecology",
+          "topics": [
+            "Species interactions: Competition, predation, mutualism, commensalism, parasitism",
+            "Niche concept: Fundamental vs realized niche",
+            "Keystone species: Disproportionate ecosystem effects",
+            "Ecological succession: Primary and secondary succession"
+          ]
+        },
+        {
+          "chapter_number": "8.3",
+          "title": "Ecosystem Ecology",
+          "topics": [
+            "Energy flow: Producers, consumers, decomposers",
+            "Trophic levels: Food chains and food webs",
+            "Ecological pyramids: Energy, biomass, numbers",
+            "Primary productivity: Gross vs net primary production"
+          ]
+        },
+        {
+          "chapter_number": "8.4",
+          "title": "Biogeochemical Cycles",
+          "topics": [
+            "Carbon cycle: Photosynthesis, respiration, decomposition, fossil fuels",
+            "Nitrogen cycle: Nitrogen fixation, nitrification, denitrification",
+            "Water cycle: Evaporation, precipitation, transpiration",
+            "Phosphorus cycle: Weathering, uptake, decomposition"
+          ]
+        },
+        {
+          "chapter_number": "8.5",
+          "title": "Global Ecology and Conservation",
+          "topics": [
+            "Biomes: Terrestrial and aquatic ecosystems",
+            "Climate change: Greenhouse effect, global warming impacts",
+            "Biodiversity: Importance and threats",
+            "Conservation biology: Habitat preservation, endangered species"
           ]
         }
       ]
